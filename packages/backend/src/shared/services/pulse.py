@@ -1,13 +1,13 @@
 import datetime
-from decimal import Decimal
 import logging
-from typing import Any
-from botocore.exceptions import ClientError, BotoCoreError
 import uuid
+from decimal import Decimal
+from typing import Any
 
-from src.shared.services.aws import get_ddb_table
+from botocore.exceptions import BotoCoreError, ClientError
+
 from src.shared.models.pulse import PulseCreationError
-
+from src.shared.services.aws import get_ddb_table
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +21,7 @@ def get_start_pulse_table_name() -> str:
     """
     return "StartPulsesTable"  # Replace with your actual table name or configuration retrieval logic
 
+
 def get_ingest_pulse_table_name() -> str:
     """
     Retrieve the name of the DynamoDB table used for storing pulses.
@@ -30,15 +31,15 @@ def get_ingest_pulse_table_name() -> str:
     """
     return "IngestPulsesTable"  # Replace with your actual table name or configuration retrieval logic
 
-# Initialize DynamoDB resource
 
+# Initialize DynamoDB resource
 
 
 def start_pulse(
     user_id: str,
     start_time: datetime.datetime,
     intent: str,
-    table_name:str,
+    table_name: str,
     pulse_id: str | None = None,
     duration_seconds: int | None = None,
     tags: list[str] | None = None,
@@ -120,6 +121,7 @@ def start_pulse(
         logger.error(f"Unexpected error creating pulse: {str(e)}")
         raise PulseCreationError(f"Failed to create pulse: {str(e)}")
 
+
 def _delete_pulse(
     user_id: str,
     table_name: str,
@@ -134,8 +136,7 @@ def _delete_pulse(
     """
     try:
         response = get_ddb_table(table_name).delete_item(
-            Key={"user_id": user_id},
-            ReturnValues="ALL_OLD"
+            Key={"user_id": user_id}, ReturnValues="ALL_OLD"
         )
 
         if "Attributes" in response:
@@ -154,11 +155,12 @@ def _delete_pulse(
         logger.error(f"Unexpected error deleting pulse for user {user_id}: {str(e)}")
     return None
 
+
 def _send_pulse_to_ingestion(
     pulse: Any,
     reflection: str,
     stopped_at: datetime.datetime,
-    stop_pulse_table_name: str
+    stop_pulse_table_name: str,
 ) -> dict | None:
     """
     Send a pulse to the ingestion service by stopping it and returning the pulse data.
@@ -178,7 +180,6 @@ def _send_pulse_to_ingestion(
         "stopped_at": stopped_at.isoformat(),
         "pulse_id": pulse.get("pulse_id", str(uuid.uuid4())),  # Ensure pulse_id is set
         "user_id": pulse.get("user_id", "unknown_user"),  # Ensure user_id is set
-        
     }
     try:
         get_ddb_table(stop_pulse_table_name).put_item(
@@ -194,9 +195,11 @@ def _send_pulse_to_ingestion(
     except BotoCoreError as e:
         logger.error(f"AWS connection error: {str(e)}")
     except Exception as e:
-        logger.error(f"Unexpected error sending pulse {item['pulse_id']} to ingestion: {str(e)}")
+        logger.error(
+            f"Unexpected error sending pulse {item['pulse_id']} to ingestion: {str(e)}"
+        )
     return None
-    
+
 
 def stop_pulse(
     user_id: str,
@@ -220,22 +223,20 @@ def stop_pulse(
         user_id=user_id,
         table_name=start_pulse_table_name,
     )
-    
+
     _pulse = response.get("Attributes", None)
     if not _pulse:
         logger.warning(f"No pulse found for user {user_id} to stop")
-        return None        
-    
+        return None
+
     logger.info(f"Pulse stopped for user {user_id}: {_pulse}")
     ingest_pulse = _send_pulse_to_ingestion(
         pulse=_pulse,
         reflection=reflection,
         stopped_at=stopped_at,
-        stop_pulse_table_name=stop_pulse_table_name
+        stop_pulse_table_name=stop_pulse_table_name,
     )
     return ingest_pulse
-
-    
 
 
 def get_start_pulse(user_id: str, table_name: str) -> dict | None:

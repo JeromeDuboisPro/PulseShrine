@@ -1,13 +1,15 @@
 import boto3
+from mypy_boto3_dynamodb.service_resource import Table  # type: ignore
 
 from src.shared.services.aws import get_region_name
 
-from mypy_boto3_dynamodb.service_resource import Table  # type: ignore
 
 def create_start_pulse_table() -> Table:
     """Create a mock DynamoDB table for pulse data."""
-    from src.shared.services.pulse import get_start_pulse_table_name  # Replace with your actual import
-    
+    from src.shared.services.pulse import (
+        get_start_pulse_table_name,
+    )  # Replace with your actual import
+
     dynamodb_resource = boto3.resource("dynamodb", region_name=get_region_name())
     table = dynamodb_resource.create_table(
         TableName=get_start_pulse_table_name(),
@@ -17,16 +19,19 @@ def create_start_pulse_table() -> Table:
         ],
         BillingMode="PAY_PER_REQUEST",
     )
-    
+
     # Wait for table to be created
     table.wait_until_exists()
-    
+
     return table
+
 
 def create_ingest_pulse_table() -> Table:
     """Create a mock DynamoDB table for pulse data."""
-    from src.shared.services.pulse import get_ingest_pulse_table_name  # Replace with your actual import
-    
+    from src.shared.services.pulse import (
+        get_ingest_pulse_table_name,
+    )  # Replace with your actual import
+
     dynamodb_resource = boto3.resource("dynamodb", region_name=get_region_name())
     table = dynamodb_resource.create_table(
         TableName=get_ingest_pulse_table_name(),
@@ -36,8 +41,8 @@ def create_ingest_pulse_table() -> Table:
         ],
         BillingMode="PAY_PER_REQUEST",
     )
-    
+
     # Wait for table to be created
     table.wait_until_exists()
-    
+
     return table

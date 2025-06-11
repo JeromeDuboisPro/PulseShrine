@@ -1,9 +1,11 @@
-from moto import mock_aws
 from datetime import datetime
 
+from moto import mock_aws
+
 # Your pulse creation code here (from previous artifact)
-from src.shared.services.pulse import start_pulse, get_start_pulse
+from src.shared.services.pulse import get_start_pulse, start_pulse
 from tests.fixtures.ddb import create_start_pulse_table
+
 
 @mock_aws
 def test_create_pulse_with_moto():
@@ -39,12 +41,12 @@ def test_create_pulse_with_moto():
         user_id="test_user_2",
         start_time=datetime.now(),
         intent="other_intent",
-        table_name=table.name
+        table_name=table.name,
     )
     pulse = get_start_pulse(
         user_id="test_user_2",
         table_name=table.name,
     )
-    assert pulse["pulse_id"] == pulse_id    
+    assert pulse["pulse_id"] == pulse_id
     assert pulse["user_id"] == "test_user_2"
     assert pulse["intent"] == "other_intent"

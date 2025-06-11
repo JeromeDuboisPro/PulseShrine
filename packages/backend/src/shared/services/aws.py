@@ -1,7 +1,8 @@
+import os
 from functools import cache
+
 import boto3
 from boto3.resources.base import ServiceResource
-import os
 
 
 def get_region_name() -> str:
@@ -23,6 +24,7 @@ def get_dynamodb_resource() -> ServiceResource:
         boto3.resources.base.ServiceResource: The DynamoDB resource.
     """
     return boto3.resource("dynamodb", region_name=get_region_name())
+
 
 @cache
 def get_ddb_table(table_name: str):
