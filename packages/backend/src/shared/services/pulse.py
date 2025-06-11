@@ -1,7 +1,7 @@
 import datetime
 from decimal import Decimal
-from functools import cache
 import logging
+from typing import Any
 from botocore.exceptions import ClientError, BotoCoreError
 import uuid
 
@@ -19,7 +19,7 @@ def get_start_pulse_table_name() -> str:
     Returns:
         str: The name of the DynamoDB table.
     """
-    return "PulsesTable"  # Replace with your actual table name or configuration retrieval logic
+    return "StartPulsesTable"  # Replace with your actual table name or configuration retrieval logic
 
 def get_ingest_pulse_table_name() -> str:
     """
@@ -92,12 +92,6 @@ def start_pulse(
 
             end_time = start_time + timedelta(seconds=duration_seconds)
             item["end_time"] = end_time.isoformat()
-
-        # Add GSI keys for common query patterns
-        item["user_id_start_time"] = f"{user_id}#{start_time_iso}"
-
-        if is_public:
-            item["public_start_time"] = f"PUBLIC#{start_time_iso}"
 
         # Put item into DynamoDB
         get_ddb_table(table_name).put_item(
