@@ -31,6 +31,7 @@ def test_create_pulse_with_moto():
         user_id="test_user",
         table_name=table.name,
     )
+    assert pulse["pulse_id"] == pulse_id
     assert pulse["user_id"] == "test_user"
     assert pulse["intent"] == "test_intent"
 
@@ -44,5 +45,6 @@ def test_create_pulse_with_moto():
         user_id="test_user_2",
         table_name=table.name,
     )
+    assert pulse["pulse_id"] == pulse_id    
     assert pulse["user_id"] == "test_user_2"
     assert pulse["intent"] == "other_intent"
