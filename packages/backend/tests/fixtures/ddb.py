@@ -4,7 +4,7 @@ from src.shared.services.aws import get_region_name
 
 from mypy_boto3_dynamodb.service_resource import Table  # type: ignore
 
-def create_pulse_table() -> Table:
+def create_start_pulse_table() -> Table:
     """Create a mock DynamoDB table for pulse data."""
     from src.shared.services.pulse import get_start_pulse_table_name  # Replace with your actual import
     

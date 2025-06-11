@@ -3,14 +3,14 @@ from datetime import datetime
 
 # Your pulse creation code here (from previous artifact)
 from src.shared.services.pulse import start_pulse, get_start_pulse
-from tests.fixtures.ddb import create_pulse_table
+from tests.fixtures.ddb import create_start_pulse_table
 
 @mock_aws
 def test_create_pulse_with_moto():
     """Test pulse creation using moto mock"""
 
     # Create test table
-    table = create_pulse_table()
+    table = create_start_pulse_table()
 
     # Test pulse creation
     pulse_id = start_pulse(
