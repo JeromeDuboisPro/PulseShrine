@@ -202,6 +202,48 @@ def _send_pulse_to_ingestion(
     except Exception as e:
         logger.error(f"Unexpected error sending pulse {item['pulse_id']} to ingestion: {str(e)}")
     return None
+    
+
+def stop_pulse(
+    user_id: str,
+    start_pulse_table_name: str,
+    stop_pulse_table_name: str,
+    reflection: str,
+    stopped_at: datetime.datetime,
+) -> Any:
+    """
+    Stop a pulse for the given user by removing it from the DynamoDB table.
+
+    Args:
+        user_id (str): ID of the user whose pulse is to be stopped.
+        table_name (str): Name of the DynamoDB table.
+
+    Returns:
+        bool: True if the pulse was successfully stopped, False otherwise.
+    """
+
+    response = _delete_pulse(
+        user_id=user_id,
+        table_name=start_pulse_table_name,
+    )
+    
+    _pulse = response.get("Attributes", None)
+    if not _pulse:
+        logger.warning(f"No pulse found for user {user_id} to stop")
+        return None        
+    
+    logger.info(f"Pulse stopped for user {user_id}: {_pulse}")
+    ingest_pulse = _send_pulse_to_ingestion(
+        pulse=_pulse,
+        reflection=reflection,
+        stopped_at=stopped_at,
+        stop_pulse_table_name=stop_pulse_table_name
+    )
+    return ingest_pulse
+
+    
+
+
 def get_start_pulse(user_id: str, table_name: str) -> dict | None:
     """
     Retrieve a pulse by its ID from the DynamoDB table.
