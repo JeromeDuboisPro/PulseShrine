@@ -160,6 +160,48 @@ def _delete_pulse(
         logger.error(f"Unexpected error deleting pulse for user {user_id}: {str(e)}")
     return None
 
+def _send_pulse_to_ingestion(
+    pulse: Any,
+    reflection: str,
+    stopped_at: datetime.datetime,
+    stop_pulse_table_name: str
+) -> dict | None:
+    """
+    Send a pulse to the ingestion service by stopping it and returning the pulse data.
+
+    Args:
+        user_id (str): ID of the user whose pulse is to be sent.
+        start_pulse_table_name (str): Name of the DynamoDB table for starting pulses.
+        stop_pulse_table_name (str): Name of the DynamoDB table for stopping pulses.
+
+    Returns:
+        dict: The pulse data if successfully stopped, otherwise None.
+    """
+    # Put item into DynamoDB
+    item = {
+        **pulse,
+        "reflection": reflection,
+        "stopped_at": stopped_at.isoformat(),
+        "pulse_id": pulse.get("pulse_id", str(uuid.uuid4())),  # Ensure pulse_id is set
+        "user_id": pulse.get("user_id", "unknown_user"),  # Ensure user_id is set
+        
+    }
+    try:
+        get_ddb_table(stop_pulse_table_name).put_item(
+            Item=item,
+            ConditionExpression="attribute_not_exists(pulse_id)",  # Prevent overwrites
+        )
+        logger.info(f"Successfully sent pulse {item['pulse_id']} to ingestion")
+        return item
+    except ClientError as e:
+        logger.error(
+            f"Error sending pulse {item['pulse_id']} to ingestion: {e.response['Error']['Message']}"
+        )
+    except BotoCoreError as e:
+        logger.error(f"AWS connection error: {str(e)}")
+    except Exception as e:
+        logger.error(f"Unexpected error sending pulse {item['pulse_id']} to ingestion: {str(e)}")
+    return None
 def get_start_pulse(user_id: str, table_name: str) -> dict | None:
     """
     Retrieve a pulse by its ID from the DynamoDB table.
