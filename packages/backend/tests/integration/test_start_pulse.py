@@ -1,10 +1,8 @@
-import boto3
 from moto import mock_aws
 from datetime import datetime
 
 # Your pulse creation code here (from previous artifact)
-from src.shared.services.aws import get_region_name
-from src.shared.services.pulse import start_pulse, get_start_pulse, get_start_pulse_table_name
+from src.shared.services.pulse import start_pulse, get_start_pulse
 from tests.fixtures.ddb import create_pulse_table
 
 @mock_aws
@@ -30,7 +28,7 @@ def test_create_pulse_with_moto():
 
     # Verify the pulse was created
     pulse = get_start_pulse(
-        pulse_id=pulse_id,
+        user_id="test_user",
         table_name=table.name,
     )
     assert pulse["user_id"] == "test_user"
@@ -43,7 +41,7 @@ def test_create_pulse_with_moto():
         table_name=table.name
     )
     pulse = get_start_pulse(
-        pulse_id=pulse_id,
+        user_id="test_user_2",
         table_name=table.name,
     )
     assert pulse["user_id"] == "test_user_2"

@@ -119,7 +119,7 @@ def start_pulse(
         raise PulseCreationError(f"Failed to create pulse: {str(e)}")
 
 
-def get_start_pulse(pulse_id: str, table_name: str) -> dict | None:
+def get_start_pulse(user_id: str, table_name: str) -> dict | None:
     """
     Retrieve a pulse by its ID from the DynamoDB table.
 
@@ -130,17 +130,17 @@ def get_start_pulse(pulse_id: str, table_name: str) -> dict | None:
         dict: The pulse item if found, otherwise None.
     """
     try:
-        response = get_ddb_table(table_name).get_item(Key={"pulse_id": pulse_id})
+        response = get_ddb_table(table_name).get_item(Key={"user_id": user_id})
         return response.get("Item", None)
 
     except ClientError as e:
         logger.error(
-            f"Error retrieving pulse {pulse_id}: {e.response['Error']['Message']}"
+            f"Error retrieving pulse for user {user_id}: {e.response['Error']['Message']}"
         )
         return None
     except BotoCoreError as e:
         logger.error(f"AWS connection error: {str(e)}")
         return None
     except Exception as e:
-        logger.error(f"Unexpected error retrieving pulse {pulse_id}: {str(e)}")
+        logger.error(f"Unexpected error retrieving pulse for user {user_id}: {str(e)}")
         return None
