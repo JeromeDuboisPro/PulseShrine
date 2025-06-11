@@ -1,7 +1,4 @@
 import boto3
-import boto3.resources
-import boto3.resources.factory
-import boto3.resources.model
 
 from src.shared.services.aws import get_region_name
 
