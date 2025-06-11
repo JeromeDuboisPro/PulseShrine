@@ -126,6 +126,39 @@ def start_pulse(
         logger.error(f"Unexpected error creating pulse: {str(e)}")
         raise PulseCreationError(f"Failed to create pulse: {str(e)}")
 
+def _delete_pulse(
+    user_id: str,
+    table_name: str,
+) -> Any:
+    """
+    Delete a pulse for the given user by removing it from the DynamoDB table.
+    Args:
+        user_id (str): ID of the user whose pulse is to be deleted.
+        table_name (str): Name of the DynamoDB table.
+    Returns:
+        bool: True if the pulse was successfully deleted, False otherwise.
+    """
+    try:
+        response = get_ddb_table(table_name).delete_item(
+            Key={"user_id": user_id},
+            ReturnValues="ALL_OLD"
+        )
+
+        if "Attributes" in response:
+            logger.info(f"Successfully deleted pulse for user {user_id}")
+            return response
+        else:
+            logger.warning(f"No pulse found for user {user_id} to delete")
+
+    except ClientError as e:
+        logger.error(
+            f"Error deleting pulse for user {user_id}: {e.response['Error']['Message']}"
+        )
+    except BotoCoreError as e:
+        logger.error(f"AWS connection error: {str(e)}")
+    except Exception as e:
+        logger.error(f"Unexpected error deleting pulse for user {user_id}: {str(e)}")
+    return None
 
 def get_start_pulse(user_id: str, table_name: str) -> dict | None:
     """
