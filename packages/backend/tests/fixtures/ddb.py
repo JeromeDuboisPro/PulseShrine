@@ -26,15 +26,15 @@ def create_start_pulse_table() -> Table:
     return table
 
 
-def create_ingest_pulse_table() -> Table:
+def create_stop_pulse_table() -> Table:
     """Create a mock DynamoDB table for pulse data."""
     from src.shared.services.pulse import (
-        get_ingest_pulse_table_name,
+        get_stop_pulse_table_name,
     )  # Replace with your actual import
 
     dynamodb_resource = boto3.resource("dynamodb", region_name=get_region_name())
     table = dynamodb_resource.create_table(
-        TableName=get_ingest_pulse_table_name(),
+        TableName=get_stop_pulse_table_name(),
         KeySchema=[{"AttributeName": "pulse_id", "KeyType": "HASH"}],
         AttributeDefinitions=[
             {"AttributeName": "pulse_id", "AttributeType": "S"},

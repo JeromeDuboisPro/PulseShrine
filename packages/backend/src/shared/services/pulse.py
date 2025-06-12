@@ -22,14 +22,14 @@ def get_start_pulse_table_name() -> str:
     return "StartPulsesTable"  # Replace with your actual table name or configuration retrieval logic
 
 
-def get_ingest_pulse_table_name() -> str:
+def get_stop_pulse_table_name() -> str:
     """
     Retrieve the name of the DynamoDB table used for storing pulses.
 
     Returns:
         str: The name of the DynamoDB table.
     """
-    return "IngestPulsesTable"  # Replace with your actual table name or configuration retrieval logic
+    return "StopPulsesTable"  # Replace with your actual table name or configuration retrieval logic
 
 
 # Initialize DynamoDB resource

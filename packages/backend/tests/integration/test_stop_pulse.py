@@ -4,7 +4,7 @@ from moto import mock_aws
 
 # Your pulse creation code here (from previous artifact)
 from src.shared.services.pulse import start_pulse, stop_pulse
-from tests.fixtures.ddb import create_ingest_pulse_table, create_start_pulse_table
+from tests.fixtures.ddb import create_stop_pulse_table, create_start_pulse_table
 
 
 @mock_aws
@@ -26,7 +26,7 @@ def test_stop_pulse_with_moto():
         table_name=start_pulse_table.name,
     )
 
-    stop_pulse_table = create_ingest_pulse_table()
+    stop_pulse_table = create_stop_pulse_table()
 
     ingest_pulse = stop_pulse(
         user_id=user_id,
@@ -75,7 +75,7 @@ def test_stop_pulse_no_pulse_with_moto():
 
     # Create test table
     start_pulse_table = create_start_pulse_table()
-    stop_pulse_table = create_ingest_pulse_table()
+    stop_pulse_table = create_stop_pulse_table()
 
     ingest_pulse = stop_pulse(
         user_id="test_user",
