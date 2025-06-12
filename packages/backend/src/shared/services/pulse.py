@@ -6,7 +6,13 @@ from typing import Any
 
 from botocore.exceptions import BotoCoreError, ClientError
 
-from src.shared.models.pulse import PulseCreationError, StartPulse, StopPulse
+from src.shared.services.generators import PulseTitleGenerator
+from src.shared.models.pulse import (
+    ArchivedPulse,
+    PulseCreationError,
+    StartPulse,
+    StopPulse,
+)
 from src.shared.services.aws import get_ddb_table
 
 logger = logging.getLogger(__name__)
@@ -140,7 +146,7 @@ def start_pulse(
         raise PulseCreationError(f"Failed to create pulse: {str(e)}")
 
 
-def _delete_pulse(
+def _delete_start_pulse(
     user_id: str,
     table_name: str,
 ) -> Any:
@@ -171,6 +177,40 @@ def _delete_pulse(
         logger.error(f"AWS connection error: {str(e)}")
     except Exception as e:
         logger.error(f"Unexpected error deleting pulse for user {user_id}: {str(e)}")
+    return None
+
+
+def _delete_stop_pulse(
+    pulse_id: str,
+    table_name: str,
+) -> Any:
+    """
+    Delete a pulse for the given user by removing it from the DynamoDB table.
+    Args:
+        user_id (str): ID of the user whose pulse is to be deleted.
+        table_name (str): Name of the DynamoDB table.
+    Returns:
+        bool: True if the pulse was successfully deleted, False otherwise.
+    """
+    try:
+        response = get_ddb_table(table_name).delete_item(
+            Key={"pulse_id": pulse_id}, ReturnValues="ALL_OLD"
+        )
+
+        if "Attributes" in response:
+            logger.info(f"Successfully deleted pulse {pulse_id}")
+            return response
+        else:
+            logger.warning(f"No pulse found for {pulse_id} to delete")
+
+    except ClientError as e:
+        logger.error(
+            f"Error deleting pulse {pulse_id}: {e.response['Error']['Message']}"
+        )
+    except BotoCoreError as e:
+        logger.error(f"AWS connection error: {str(e)}")
+    except Exception as e:
+        logger.error(f"Unexpected error deleting pulse {pulse_id}: {str(e)}")
     return None
 
 
@@ -232,7 +272,7 @@ def stop_pulse(
         bool: True if the pulse was successfully stopped, False otherwise.
     """
 
-    response = _delete_pulse(
+    response = _delete_start_pulse(
         user_id=user_id,
         table_name=start_pulse_table_name,
     )
@@ -327,10 +367,51 @@ def get_stop_pulse(
         return None
 
 
+def _send_ingested_pulse_to_ingested_archive(
+    archived_pulse: ArchivedPulse,
+    ingested_pulse_table_name: str,
+) -> StopPulse | None:
+    """
+    Send a pulse to the ingestion service by stopping it and returning the pulse data.
+
+    Args:
+        user_id (str): ID of the user whose pulse is to be sent.
+        start_pulse_table_name (str): Name of the DynamoDB table for starting pulses.
+        stop_pulse_table_name (str): Name of the DynamoDB table for stopping pulses.
+
+    Returns:
+        dict: The pulse data if successfully stopped, otherwise None.
+    """
+    # Put item into DynamoDB
+    item = {
+        **archived_pulse.model_dump(),
+    }
+
+    try:
+        get_ddb_table(ingested_pulse_table_name).put_item(
+            Item=item,
+            ConditionExpression="attribute_not_exists(pulse_id)",  # Prevent overwrites
+        )
+        logger.info(f"Successfully sent pulse {item['pulse_id']} to archives")
+        return stop_pulse
+    except ClientError as e:
+        logger.error(
+            f"Error sending pulse {item['pulse_id']} to archives: {e.response['Error']['Message']}"
+        )
+    except BotoCoreError as e:
+        logger.error(f"AWS connection error: {str(e)}")
+    except Exception as e:
+        logger.error(
+            f"Unexpected error sending pulse {item['pulse_id']} to archives: {str(e)}"
+        )
+    return None
+
+
 def ingest_pulse(
     pulse_id: str,
-    table_name: str = None,
-) -> dict | None:
+    stop_pulse_table_name: str,
+    ingested_pulse_table_name: str,
+) -> ArchivedPulse | None:
     """
     Ingest a pulse for the given user by stopping it and returning the pulse data.
 
@@ -342,7 +423,41 @@ def ingest_pulse(
     Returns:
         dict: The pulse data if successfully ingested, otherwise None.
     """
-    pulse = get_stop_pulse(pulse_id=pulse_id, table_name=table_name)
-    if not pulse:
+    ingest_pulse = get_stop_pulse(pulse_id=pulse_id, table_name=stop_pulse_table_name)
+    if not ingest_pulse:
         logger.warning(f"No pulse found with ID {pulse_id} to ingest")
         return None
+    generated_title = PulseTitleGenerator.generate_title(ingest_pulse)
+    badge = PulseTitleGenerator.get_achievement_badge(ingest_pulse)
+    if not generated_title:
+        logger.warning(f"Failed to generate title for pulse {pulse_id}")
+        return None
+    logger.info(f"Generated title for pulse {pulse_id}: {generated_title}")
+    if not badge:
+        logger.warning(f"Failed to generate badge for pulse {pulse_id}")
+        return None
+    logger.info(f"Generated badge for pulse {pulse_id}: {badge}")
+    _delete_stop_pulse(
+        pulse_id=pulse_id,
+        table_name=stop_pulse_table_name,
+    )
+    # Store the ingested pulse in the ingested pulses table
+    archived_pulse = ArchivedPulse(
+        user_id=ingest_pulse.user_id,
+        pulse_id=ingest_pulse.pulse_id,
+        start_time=ingest_pulse.start_time,
+        intent=ingest_pulse.intent,
+        reflection=ingest_pulse.reflection,
+        stopped_at=ingest_pulse.stopped_at,
+        duration_seconds=ingest_pulse.duration_seconds,
+        tags=ingest_pulse.tags,
+        is_public=ingest_pulse.is_public,
+        archived_at=datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        gen_title=generated_title,
+        gen_badge=badge,
+    )
+    _send_ingested_pulse_to_ingested_archive(
+        archived_pulse=archived_pulse,
+        ingested_pulse_table_name=ingested_pulse_table_name,
+    )
+    return archived_pulse
