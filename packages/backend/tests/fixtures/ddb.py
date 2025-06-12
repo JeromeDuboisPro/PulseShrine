@@ -46,3 +46,25 @@ def create_stop_pulse_table() -> Table:
     table.wait_until_exists()
 
     return table
+
+
+def create_ingested_pulse_table() -> Table:
+    """Create a mock DynamoDB table for pulse data."""
+    from src.shared.services.pulse import (
+        get_ingested_pulse_table_name,
+    )  # Replace with your actual import
+
+    dynamodb_resource = boto3.resource("dynamodb", region_name=get_region_name())
+    table = dynamodb_resource.create_table(
+        TableName=get_ingested_pulse_table_name(),
+        KeySchema=[{"AttributeName": "pulse_id", "KeyType": "HASH"}],
+        AttributeDefinitions=[
+            {"AttributeName": "pulse_id", "AttributeType": "S"},
+        ],
+        BillingMode="PAY_PER_REQUEST",
+    )
+
+    # Wait for table to be created
+    table.wait_until_exists()
+
+    return table
