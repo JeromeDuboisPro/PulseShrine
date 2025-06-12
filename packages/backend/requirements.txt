@@ -4,3 +4,4 @@ pydantic
 textblob
 emoji
 fuzzywuzzy
+python-Levenshtein
