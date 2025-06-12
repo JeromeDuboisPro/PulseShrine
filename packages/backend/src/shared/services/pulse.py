@@ -6,7 +6,7 @@ from typing import Any
 
 from botocore.exceptions import BotoCoreError, ClientError
 
-from src.shared.models.pulse import PulseCreationError
+from src.shared.models.pulse import PulseCreationError, StartPulse, StopPulse
 from src.shared.services.aws import get_ddb_table
 
 logger = logging.getLogger(__name__)
@@ -44,7 +44,7 @@ def start_pulse(
     duration_seconds: int | None = None,
     tags: list[str] | None = None,
     is_public: bool = False,
-) -> str:
+) -> StartPulse:
     """
     Create a new pulse with the given parameters and store it in the provided DynamoDB table.
 
@@ -101,7 +101,15 @@ def start_pulse(
         )
 
         logger.info(f"Successfully created pulse {pulse_id} for user {user_id}")
-        return pulse_id
+        return StartPulse(
+            user_id=user_id,
+            pulse_id=pulse_id,
+            start_time=start_time_iso,
+            intent=intent,
+            duration_seconds=duration_seconds,
+            tags=tags,
+            is_public=is_public,
+        )
 
     except ClientError as e:
         error_code = e.response["Error"]["Code"]
@@ -157,11 +165,9 @@ def _delete_pulse(
 
 
 def _send_pulse_to_ingestion(
-    pulse: Any,
-    reflection: str,
-    stopped_at: datetime.datetime,
+    stop_pulse: StopPulse,
     stop_pulse_table_name: str,
-) -> dict | None:
+) -> StopPulse | None:
     """
     Send a pulse to the ingestion service by stopping it and returning the pulse data.
 
@@ -175,24 +181,16 @@ def _send_pulse_to_ingestion(
     """
     # Put item into DynamoDB
     item = {
-        **pulse,
-        "reflection": reflection,
-        "stopped_at": stopped_at.isoformat(),
-        "pulse_id": pulse.get("pulse_id", str(uuid.uuid4())),  # Ensure pulse_id is set
-        "user_id": pulse.get("user_id", "unknown_user"),  # Ensure user_id is set
+        **stop_pulse.model_dump(),
     }
-    if "duration_seconds" not in item:
-        start_time = datetime.datetime.fromisoformat(item["start_time"])
-        item["duration_seconds"] = Decimal(
-            int((stopped_at - start_time).total_seconds())
-        )
+
     try:
         get_ddb_table(stop_pulse_table_name).put_item(
             Item=item,
             ConditionExpression="attribute_not_exists(pulse_id)",  # Prevent overwrites
         )
         logger.info(f"Successfully sent pulse {item['pulse_id']} to ingestion")
-        return item
+        return stop_pulse
     except ClientError as e:
         logger.error(
             f"Error sending pulse {item['pulse_id']} to ingestion: {e.response['Error']['Message']}"
@@ -212,7 +210,7 @@ def stop_pulse(
     stop_pulse_table_name: str,
     reflection: str,
     stopped_at: datetime.datetime,
-) -> Any:
+) -> StopPulse | None:
     """
     Stop a pulse for the given user by removing it from the DynamoDB table.
 
@@ -235,16 +233,25 @@ def stop_pulse(
         return None
 
     logger.info(f"Pulse stopped for user {user_id}: {_pulse}")
-    ingest_pulse = _send_pulse_to_ingestion(
-        pulse=_pulse,
+    stop_pulse = StopPulse(
+        user_id=user_id,
+        pulse_id=_pulse["pulse_id"],
+        start_time=_pulse["start_time"],
+        intent=_pulse["intent"],
         reflection=reflection,
-        stopped_at=stopped_at,
+        stopped_at=stopped_at.isoformat(),
+        duration_seconds=_pulse.get("duration_seconds"),
+        tags=_pulse.get("tags"),
+        is_public=_pulse.get("is_public", False),
+    )
+    stop_pulse = _send_pulse_to_ingestion(
+        stop_pulse=stop_pulse,
         stop_pulse_table_name=stop_pulse_table_name,
     )
-    return ingest_pulse
+    return stop_pulse
 
 
-def get_start_pulse(user_id: str, table_name: str) -> dict | None:
+def get_start_pulse(user_id: str, table_name: str) -> StartPulse | None:
     """
     Retrieve a pulse by its ID from the DynamoDB table.
 
@@ -256,7 +263,11 @@ def get_start_pulse(user_id: str, table_name: str) -> dict | None:
     """
     try:
         response = get_ddb_table(table_name).get_item(Key={"user_id": user_id})
-        return response.get("Item", None)
+        item = response.get("Item")
+        if not item:
+            logger.warning(f"No pulse found for user {user_id}")
+            return None
+        return StartPulse(**item)
 
     except ClientError as e:
         logger.error(
@@ -268,4 +279,60 @@ def get_start_pulse(user_id: str, table_name: str) -> dict | None:
         return None
     except Exception as e:
         logger.error(f"Unexpected error retrieving pulse for user {user_id}: {str(e)}")
+        return None
+
+
+def get_stop_pulse(
+    pulse_id: str,
+    table_name: str,
+) -> StopPulse | None:
+    """
+    Retrieve a pulse by its ID from the DynamoDB table.
+
+    Args:
+        pulse_id (str): The ID of the pulse to retrieve.
+        table_name (str, optional): The name of the DynamoDB table. Defaults to None.
+
+    Returns:
+        dict: The pulse item if found, otherwise None.
+    """
+    try:
+        response = get_ddb_table(table_name).get_item(Key={"pulse_id": pulse_id})
+        item = response.get("Item")
+        if not item:
+            logger.warning(f"No pulse found with ID {pulse_id}")
+            return None
+        return StopPulse(**item)
+
+    except ClientError as e:
+        logger.error(
+            f"Error retrieving pulse {pulse_id}: {e.response['Error']['Message']}"
+        )
+        return None
+    except BotoCoreError as e:
+        logger.error(f"AWS connection error: {str(e)}")
+        return None
+    except Exception as e:
+        logger.error(f"Unexpected error retrieving pulse {pulse_id}: {str(e)}")
+        return None
+
+
+def ingest_pulse(
+    pulse_id: str,
+    table_name: str = None,
+) -> dict | None:
+    """
+    Ingest a pulse for the given user by stopping it and returning the pulse data.
+
+    Args:
+        user_id (str): ID of the user whose pulse is to be ingested.
+        reflection (str): Reflection text associated with the pulse.
+        stopped_at (datetime): Time when the pulse was stopped.
+
+    Returns:
+        dict: The pulse data if successfully ingested, otherwise None.
+    """
+    pulse = get_stop_pulse(pulse_id=pulse_id, table_name=table_name)
+    if not pulse:
+        logger.warning(f"No pulse found with ID {pulse_id} to ingest")
         return None

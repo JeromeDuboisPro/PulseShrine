@@ -16,7 +16,7 @@ def test_stop_pulse_with_moto():
 
     user_id = "test_user"
 
-    pulse_id = start_pulse(
+    created_start_pulse = start_pulse(
         user_id=user_id,
         start_time=datetime.now(),
         intent="test_intent",
@@ -36,12 +36,12 @@ def test_stop_pulse_with_moto():
         stopped_at=datetime.now(),
     )
     assert ingest_pulse is not None
-    assert ingest_pulse["user_id"] == user_id
-    assert ingest_pulse["reflection"] == "Test reflection"
-    assert ingest_pulse["pulse_id"] == pulse_id
-    assert ingest_pulse["duration_seconds"] == 300
+    assert ingest_pulse.user_id == user_id
+    assert ingest_pulse.reflection == "Test reflection"
+    assert ingest_pulse.pulse_id == created_start_pulse.pulse_id
+    assert ingest_pulse.duration_seconds == 300
 
-    pulse_id = start_pulse(
+    created_start_pulse = start_pulse(
         user_id=user_id,
         start_time=datetime.now(),
         intent="test_intent",
@@ -56,8 +56,8 @@ def test_stop_pulse_with_moto():
         stopped_at=datetime.now() + timedelta(seconds=10),  # Ensure duration is 0
     )
     assert ingest_pulse is not None
-    assert ingest_pulse["duration_seconds"] == 10
-    assert ingest_pulse["is_public"] == False
+    assert ingest_pulse.duration_seconds == 10
+    assert ingest_pulse.is_public == False
 
     ingest_pulse = stop_pulse(
         user_id=user_id,
