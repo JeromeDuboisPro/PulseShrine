@@ -181,6 +181,11 @@ def _send_pulse_to_ingestion(
         "pulse_id": pulse.get("pulse_id", str(uuid.uuid4())),  # Ensure pulse_id is set
         "user_id": pulse.get("user_id", "unknown_user"),  # Ensure user_id is set
     }
+    if "duration_seconds" not in item:
+        start_time = datetime.datetime.fromisoformat(item["start_time"])
+        item["duration_seconds"] = Decimal(
+            int((stopped_at - start_time).total_seconds())
+        )
     try:
         get_ddb_table(stop_pulse_table_name).put_item(
             Item=item,
