@@ -24,19 +24,13 @@ class PulseTitleGenerator:
         try:
             # Analyze components
             intensity_prefix = IntensityLevels.get_random_prefix_from_duration(duration)
-            print(f"Intensity Prefix: {intensity_prefix}")
             intent_category = IntentData.extract_intent_category(intent)
             # Get components
             sentiment_adjective = SentimentAdjectives.get_random_sentiment_adjective(
                 reflection
             )
-            print(f"Sentiment Adjective: {sentiment_adjective}")
             action_noun = IntentData.get_action_noun(intent_category)
-            print(f"Action Noun: {action_noun}")
             emoji = IntentData.get_emoji(intent_category)
-            print(f"Emoji: {emoji}")
-            # Generate motivational suffix
-            motivational_suffix = MotivationalSuffixes.get_random_suffix()
 
             # Create title variations
             title_templates = [
@@ -55,10 +49,7 @@ class PulseTitleGenerator:
                 hours = duration / 3600
                 title += f" ({hours:.1f}h marathon!)"
 
-            # Full message with motivation
-            full_message = f"{title}\n\n{motivational_suffix}"
-
-            return full_message
+            return title
 
         except Exception as e:
             # Fallback title
