@@ -37,3 +37,15 @@ class StopPulse(PulseBase):
                 )
             except Exception:
                 pass
+
+
+class ArchivedPulse(StopPulse):
+    archived_at: str
+    gen_title: str = Field(
+        default="",
+        description="Generated title for the pulse, used for display purposes",
+    )
+    gen_badge: str = Field(
+        default="",
+        description="Generated badge for the pulse, used for display purposes",
+    )
