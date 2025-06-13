@@ -1,10 +1,11 @@
 from datetime import datetime, timedelta
-
 from moto import mock_aws
 
 # Your pulse creation code here (from previous artifact)
-from src.shared.services.pulse import start_pulse, stop_pulse
-from tests.fixtures.ddb import create_stop_pulse_table, create_start_pulse_table
+from shared.models.pulse import StartPulse
+from shared.services.pulse import start_pulse, stop_pulse
+from tests.fixtures.ddb import (create_start_pulse_table,
+                                create_stop_pulse_table)
 
 
 @mock_aws
@@ -17,12 +18,14 @@ def test_stop_pulse_with_moto():
     user_id = "test_user"
 
     created_start_pulse = start_pulse(
-        user_id=user_id,
-        start_time=datetime.now(),
-        intent="test_intent",
-        duration_seconds=300,
-        tags=["test", "example"],
-        is_public=True,
+        StartPulse(
+            user_id=user_id,
+            start_time=datetime.now(),
+            intent="test_intent",
+            duration_seconds=300,
+            tags=["test", "example"],
+            is_public=True,
+        ),
         table_name=start_pulse_table.name,
     )
 
@@ -42,9 +45,11 @@ def test_stop_pulse_with_moto():
     assert ingest_pulse.duration_seconds == 300
 
     created_start_pulse = start_pulse(
-        user_id=user_id,
-        start_time=datetime.now(),
-        intent="test_intent",
+        StartPulse(
+            user_id=user_id,
+            start_time=datetime.now(),
+            intent="test_intent",
+        ),
         table_name=start_pulse_table.name,
     )
 

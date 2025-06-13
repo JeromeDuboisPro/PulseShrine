@@ -1,8 +1,8 @@
-from functools import cache
 import random
-from typing import Any, Dict, Tuple
+from functools import cache
 from pydantic import BaseModel, Field
-from textblob import TextBlob
+from textblob import TextBlob  # type: ignore
+from typing import Any, Dict, Tuple
 
 
 @cache
@@ -16,8 +16,8 @@ def _current_dir() -> str:
 @cache
 def _load_json_in_data_dir(file_name: str) -> Any:
     """Get the full path to a file in the data directory."""
-    import os
     import json
+    import os
 
     json_file_path = os.path.join(_current_dir(), "..", "data", file_name)
     with open(json_file_path, "r") as file:
@@ -175,7 +175,7 @@ class IntentData(BaseModel):
 
         best_match: tuple[str, float] = process.extractOne(input_word, choices, scorer=fuzz.ratio)  # type: ignore
         if best_match and best_match[1] >= threshold:
-            return best_match[0]
+            return best_match[0]  # type: ignore
         return None
 
     @staticmethod
@@ -276,7 +276,7 @@ class SentimentAdjectives(BaseModel):
     @staticmethod
     def get_random_sentiment_adjective(text: str) -> str:
         """Get random sentiment category for the given text."""
-        sentiment_category, polarity = SentimentAdjectives.analyze_sentiment(text)
+        sentiment_category, _ = SentimentAdjectives.analyze_sentiment(text)
         sentiment_adjective = SentimentAdjectives.get_random_adjective(
             sentiment_category
         )

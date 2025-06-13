@@ -1,17 +1,12 @@
 import datetime
-
 from moto import mock_aws
-from src.shared.services.generators import PulseTitleGenerator
-from src.shared.services.pulse import (
-    ingest_pulse,
-    start_pulse,
-    stop_pulse,
-)
-from tests.fixtures.ddb import (
-    create_ingested_pulse_table,
-    create_stop_pulse_table,
-    create_start_pulse_table,
-)
+
+from shared.models.pulse import StartPulse
+from shared.services.generators import PulseTitleGenerator
+from shared.services.pulse import ingest_pulse, start_pulse, stop_pulse
+from tests.fixtures.ddb import (create_ingested_pulse_table,
+                                create_start_pulse_table,
+                                create_stop_pulse_table)
 
 
 @mock_aws
@@ -26,9 +21,11 @@ def test_ingest_pulse():
     pulse_duration = 300  # seconds
 
     start_pulse(
-        user_id=user_id,
-        start_time=datetime.datetime.now(),
-        intent="add ingestPulse to backend",
+        StartPulse(
+            user_id=user_id,
+            start_time=datetime.datetime.now(),
+            intent="add ingestPulse to backend",
+        ),
         table_name=start_pulse_table.name,
     )
 
@@ -50,7 +47,7 @@ def test_ingest_pulse():
     ingested_table = create_ingested_pulse_table()
 
     ingested_pulse = ingest_pulse(
-        pulse_id=stopped_pulse.pulse_id,
+        stop_pulse=stopped_pulse,
         ingested_pulse_table_name=ingested_table.name,
         stop_pulse_table_name=stop_pulse_table.name,
     )

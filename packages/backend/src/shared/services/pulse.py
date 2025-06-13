@@ -1,19 +1,15 @@
 import datetime
 import logging
 import uuid
+from botocore.exceptions import BotoCoreError, ClientError
 from decimal import Decimal
 from typing import Any
 
-from botocore.exceptions import BotoCoreError, ClientError
-
-from src.shared.services.generators import PulseTitleGenerator
-from src.shared.models.pulse import (
-    ArchivedPulse,
-    PulseCreationError,
-    StartPulse,
-    StopPulse,
-)
-from src.shared.services.aws import get_ddb_table
+from shared.models.pulse import (ArchivedPulse, PulseCreationError,
+                                 PulseCreationErrorAlreadyPresent,
+                                 PulseDDBIngestionError, StartPulse, StopPulse)
+from shared.services.aws import get_ddb_table
+from shared.services.generators import PulseTitleGenerator
 
 logger = logging.getLogger(__name__)
 
@@ -52,14 +48,8 @@ def get_ingested_pulse_table_name() -> str:
 
 
 def start_pulse(
-    user_id: str,
-    start_time: datetime.datetime,
-    intent: str,
+    pulse_data: StartPulse,
     table_name: str,
-    pulse_id: str | None = None,
-    duration_seconds: int | None = None,
-    tags: list[str] | None = None,
-    is_public: bool = False,
 ) -> StartPulse:
     """
     Create a new pulse with the given parameters and store it in the provided DynamoDB table.
@@ -78,36 +68,38 @@ def start_pulse(
     """
     try:
         # Generate unique pulse ID
-        pulse_id = pulse_id or str(uuid.uuid4())
+        pulse_data.pulse_id = pulse_data.pulse_id or str(uuid.uuid4())
 
         # Convert datetime to ISO format string for DynamoDB
-        start_time_iso = start_time.isoformat()
+        start_time_iso = pulse_data.start_time_dt.isoformat()
         created_at = datetime.datetime.now(datetime.timezone.utc).isoformat()
 
         # Prepare the item to insert
         item: dict[str, str | bool | Decimal | list[str]] = {
-            "pulse_id": pulse_id,
-            "user_id": user_id,
+            "pulse_id": pulse_data.pulse_id,
+            "user_id": pulse_data.user_id,
             "start_time": start_time_iso,
-            "intent": intent,
-            "is_public": is_public,
+            "intent": pulse_data.intent,
+            "is_public": pulse_data.is_public,
             "created_at": created_at,
             "updated_at": created_at,
         }
 
         # Add optional fields if provided
-        if duration_seconds is not None:
+        if pulse_data.duration_seconds is not None:
             # Convert to Decimal for DynamoDB compatibility
-            item["duration_seconds"] = Decimal(str(duration_seconds))
+            item["duration_seconds"] = Decimal(str(pulse_data.duration_seconds))
 
-        if tags:
-            item["tags"] = tags
+        if pulse_data.tags:
+            item["tags"] = pulse_data.tags
 
         # Calculate end_time if duration is provided
-        if duration_seconds is not None:
+        if pulse_data.duration_seconds is not None:
             from datetime import timedelta
 
-            end_time = start_time + timedelta(seconds=duration_seconds)
+            end_time = pulse_data.start_time_dt + timedelta(
+                seconds=pulse_data.duration_seconds
+            )
             item["end_time"] = end_time.isoformat()
 
         # Put item into DynamoDB
@@ -116,23 +108,17 @@ def start_pulse(
             ConditionExpression="attribute_not_exists(pulse_id)",  # Prevent overwrites
         )
 
-        logger.info(f"Successfully created pulse {pulse_id} for user {user_id}")
-        return StartPulse(
-            user_id=user_id,
-            pulse_id=pulse_id,
-            start_time=start_time_iso,
-            intent=intent,
-            duration_seconds=duration_seconds,
-            tags=tags,
-            is_public=is_public,
+        logger.info(
+            f"Successfully created pulse {pulse_data.pulse_id} for user {pulse_data.user_id}"
         )
+        return pulse_data
 
     except ClientError as e:
         error_code = e.response["Error"]["Code"]
         error_message = e.response["Error"]["Message"]
 
         if error_code == "ConditionalCheckFailedException":
-            raise PulseCreationError(f"Pulse with ID {pulse_id} already exists")
+            raise PulseCreationErrorAlreadyPresent(user_id=pulse_data.user_id) from e
         elif error_code == "ResourceNotFoundException":
             raise PulseCreationError(f"Table {table_name} does not exist")
         else:
@@ -183,7 +169,7 @@ def _delete_start_pulse(
 def _delete_stop_pulse(
     pulse_id: str,
     table_name: str,
-) -> Any:
+) -> Any | None:
     """
     Delete a pulse for the given user by removing it from the DynamoDB table.
     Args:
@@ -298,6 +284,7 @@ def stop_pulse(
         stop_pulse=stop_pulse,
         stop_pulse_table_name=stop_pulse_table_name,
     )
+
     return stop_pulse
 
 
@@ -393,7 +380,7 @@ def _send_ingested_pulse_to_ingested_archive(
             ConditionExpression="attribute_not_exists(pulse_id)",  # Prevent overwrites
         )
         logger.info(f"Successfully sent pulse {item['pulse_id']} to archives")
-        return stop_pulse
+        return archived_pulse
     except ClientError as e:
         logger.error(
             f"Error sending pulse {item['pulse_id']} to archives: {e.response['Error']['Message']}"
@@ -408,7 +395,7 @@ def _send_ingested_pulse_to_ingested_archive(
 
 
 def ingest_pulse(
-    pulse_id: str,
+    stop_pulse: StopPulse,
     stop_pulse_table_name: str,
     ingested_pulse_table_name: str,
 ) -> ArchivedPulse | None:
@@ -423,41 +410,47 @@ def ingest_pulse(
     Returns:
         dict: The pulse data if successfully ingested, otherwise None.
     """
-    ingest_pulse = get_stop_pulse(pulse_id=pulse_id, table_name=stop_pulse_table_name)
-    if not ingest_pulse:
-        logger.warning(f"No pulse found with ID {pulse_id} to ingest")
-        return None
-    generated_title = PulseTitleGenerator.generate_title(ingest_pulse)
-    badge = PulseTitleGenerator.get_achievement_badge(ingest_pulse)
+    generated_title = PulseTitleGenerator.generate_title(stop_pulse)
+    badge = PulseTitleGenerator.get_achievement_badge(stop_pulse)
     if not generated_title:
-        logger.warning(f"Failed to generate title for pulse {pulse_id}")
+        logger.warning(
+            f"Failed to generate title for pulse {stop_pulse.valid_pulse_id}"
+        )
         return None
-    logger.info(f"Generated title for pulse {pulse_id}: {generated_title}")
-    if not badge:
-        logger.warning(f"Failed to generate badge for pulse {pulse_id}")
-        return None
-    logger.info(f"Generated badge for pulse {pulse_id}: {badge}")
-    _delete_stop_pulse(
-        pulse_id=pulse_id,
-        table_name=stop_pulse_table_name,
+    logger.info(
+        f"Generated title for pulse {stop_pulse.valid_pulse_id}: {generated_title}"
     )
+    if not badge:
+        logger.warning(
+            f"Failed to generate badge for pulse {stop_pulse.valid_pulse_id}"
+        )
+        return None
+    logger.info(f"Generated badge for pulse {stop_pulse.valid_pulse_id}: {badge}")
     # Store the ingested pulse in the ingested pulses table
     archived_pulse = ArchivedPulse(
-        user_id=ingest_pulse.user_id,
-        pulse_id=ingest_pulse.pulse_id,
-        start_time=ingest_pulse.start_time,
-        intent=ingest_pulse.intent,
-        reflection=ingest_pulse.reflection,
-        stopped_at=ingest_pulse.stopped_at,
-        duration_seconds=ingest_pulse.duration_seconds,
-        tags=ingest_pulse.tags,
-        is_public=ingest_pulse.is_public,
+        user_id=stop_pulse.user_id,
+        pulse_id=stop_pulse.pulse_id,
+        start_time=stop_pulse.start_time,
+        intent=stop_pulse.intent,
+        reflection=stop_pulse.reflection,
+        stopped_at=stop_pulse.stopped_at,
+        duration_seconds=stop_pulse.duration_seconds,
+        tags=stop_pulse.tags,
+        is_public=stop_pulse.is_public,
         archived_at=datetime.datetime.now(datetime.timezone.utc).isoformat(),
         gen_title=generated_title,
         gen_badge=badge,
     )
-    _send_ingested_pulse_to_ingested_archive(
+    res_archived_pulse = _send_ingested_pulse_to_ingested_archive(
         archived_pulse=archived_pulse,
         ingested_pulse_table_name=ingested_pulse_table_name,
     )
+    if res_archived_pulse is None:
+        raise PulseDDBIngestionError("Sending StopPulse to Ingestion Table failed")
+    res_delete_stop_pulse = _delete_stop_pulse(
+        pulse_id=stop_pulse.valid_pulse_id,
+        table_name=stop_pulse_table_name,
+    )
+    if res_delete_stop_pulse is None:
+        raise PulseDDBIngestionError("Deleteing StopPulse from Stop Table failed")
     return archived_pulse

@@ -1,13 +1,8 @@
 import random
 from typing import List
 
-from src.shared.models.data import (
-    IntensityLevels,
-    IntentData,
-    MotivationalSuffixes,
-    SentimentAdjectives,
-)
-from src.shared.models.pulse import StopPulse
+from shared.models.data import IntensityLevels, IntentData, SentimentAdjectives
+from shared.models.pulse import StopPulse
 
 
 class PulseTitleGenerator:

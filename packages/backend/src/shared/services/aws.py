@@ -1,8 +1,7 @@
-import os
-from functools import cache
-
 import boto3
+import os
 from boto3.resources.base import ServiceResource
+from functools import cache
 
 
 def get_region_name() -> str:

@@ -1,6 +1,7 @@
-from typing import Optional, List
-from pydantic import BaseModel, Field
 from datetime import datetime
+from functools import cached_property
+from pydantic import BaseModel, Field
+from typing import List, Optional
 
 
 class PulseCreationError(Exception):
@@ -9,29 +10,92 @@ class PulseCreationError(Exception):
     pass
 
 
+class PulseCreationErrorAlreadyPresent(PulseCreationError):
+    """Exception raised when a pulse with the same ID already exists"""
+
+    def __init__(self, user_id: str):
+        super().__init__(f"Pulse already exists for use {user_id}.")
+        self.user_id = user_id
+
+
+class PulseDDBIngestionError(Exception):
+    """Custom exception for pulse DDB Ingestion errors"""
+
+    pass
+
+
 class PulseBase(BaseModel):
     user_id: str
-    pulse_id: str
-    start_time: str
     intent: str
-    duration_seconds: Optional[int] = None
+    pulse_id: Optional[str] = Field(default=None)
+    start_time: Optional[datetime | str] = Field(
+        default_factory=datetime.now,
+        description="Start time of the pulse, defaults to now if not provided",
+    )
+    duration_seconds: Optional[int] = Field(default=None)
     tags: Optional[List[str]] = Field(default=None)
-    is_public: bool = False
+    is_public: bool = Field(default=False)
+
+    @cached_property
+    def start_time_dt(self) -> datetime:
+        """Return the start time in ISO format."""
+        if isinstance(self.start_time, datetime):
+            return self.start_time
+        elif isinstance(self.start_time, str):
+            try:
+                return datetime.fromisoformat(self.start_time)
+            except ValueError as exc:
+                raise PulseCreationError(f"Invalid start_time format: {exc}") from exc
+        else:
+            raise PulseCreationError(
+                "start_time must be a datetime or ISO formatted string"
+            )
+
+    @cached_property
+    def valid_pulse_id(self) -> str:
+        """Return a valid pulse ID, generating one if not provided."""
+        if self.pulse_id:
+            return self.pulse_id
+        raise PulseCreationError(
+            "Pulse ID is required but not provided. Please provide a valid pulse_id."
+        )
 
 
 class StartPulse(PulseBase):
+    def model_post_init(self, _):
+        if isinstance(self.start_time, str):
+            try:
+                object.__setattr__(
+                    self, "start_time", datetime.fromisoformat(self.start_time)
+                )
+            except Exception as exc:
+                raise PulseCreationError(f"Failed to parse start_time: {exc}") from exc
+
     pass
 
 
 class StopPulse(PulseBase):
     reflection: str
-    stopped_at: str
+    stopped_at: Optional[datetime | str] = Field(
+        default_factory=datetime.now,
+        description="Start time of the pulse, defaults to now if not provided",
+    )
+
+    @cached_property
+    def stopped_at_dt(self) -> datetime:
+        """Return the stopped_at time in ISO format."""
+        if isinstance(self.stopped_at, datetime):
+            return self.stopped_at
+        elif self.stopped_at:
+            return datetime.fromisoformat(self.stopped_at)
+        else:
+            raise PulseCreationError("stopped_at field cannot be None for StopPulse.")
 
     def model_post_init(self, _):
-        if self.duration_seconds is None and self.start_time and self.stopped_at:
+        if self.duration_seconds is None and self.start_time and self.stopped_at_dt:
             try:
-                start = datetime.fromisoformat(self.start_time)
-                stop = datetime.fromisoformat(self.stopped_at)
+                start = self.start_time_dt
+                stop = self.stopped_at_dt
                 object.__setattr__(
                     self, "duration_seconds", int((stop - start).total_seconds())
                 )
@@ -40,7 +104,10 @@ class StopPulse(PulseBase):
 
 
 class ArchivedPulse(StopPulse):
-    archived_at: str
+    archived_at: Optional[datetime | str] = Field(
+        default_factory=datetime.now,
+        description="Start time of the pulse, defaults to now if not provided",
+    )
     gen_title: str = Field(
         default="",
         description="Generated title for the pulse, used for display purposes",
@@ -49,3 +116,27 @@ class ArchivedPulse(StopPulse):
         default="",
         description="Generated badge for the pulse, used for display purposes",
     )
+
+    @cached_property
+    def inverted_timestamp(self) -> int:
+        """Return the stopped time 'reversed to optimize most recent search in ddb."""
+        return int(
+            (
+                datetime(year=9999, month=12, day=31, hour=23, minute=59, second=59)
+                - self.stopped_at_dt
+            ).total_seconds()
+        )
+
+    def archived_at_dt(self) -> datetime:
+        """Return the archived_at time in ISO format."""
+        if isinstance(self.archived_at, datetime):
+            return self.archived_at
+        elif isinstance(self.archived_at, str):
+            try:
+                return datetime.fromisoformat(self.archived_at)
+            except ValueError as exc:
+                raise PulseCreationError(f"Invalid archived_at format: {exc}") from exc
+        else:
+            raise PulseCreationError(
+                "archived_at must be a datetime or ISO formatted string"
+            )
