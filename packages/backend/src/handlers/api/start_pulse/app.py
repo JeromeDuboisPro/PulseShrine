@@ -1,14 +1,18 @@
 import os
 from aws_lambda_powertools import Logger
 from aws_lambda_powertools.event_handler import APIGatewayRestResolver
+from aws_lambda_powertools.event_handler.api_gateway import CORSConfig
 from aws_lambda_powertools.event_handler.exceptions import BadRequestError
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from datetime import datetime
 from pydantic import BaseModel, ValidationError
 from typing import Any
 
-from shared.models.pulse import (PulseCreationError,
-                                 PulseCreationErrorAlreadyPresent, StartPulse)
+from shared.models.pulse import (
+    PulseCreationError,
+    PulseCreationErrorAlreadyPresent,
+    StartPulse,
+)
 from shared.services.pulse import start_pulse, stop_pulse
 
 # Initialize the logger
@@ -18,8 +22,13 @@ logger = Logger()
 START_PULSE_TABLE_NAME = os.environ["START_PULSE_TABLE_NAME"]
 STOP_PULSE_TABLE_NAME = os.environ["STOP_PULSE_TABLE_NAME"]
 
+# Configure CORS
+cors_config = CORSConfig(
+    allow_origin="*",  # In production, specify your actual domain
+)
+
 # Initialize the APIGatewayRestResolver
-app = APIGatewayRestResolver()
+app = APIGatewayRestResolver(cors=cors_config)
 
 
 @app.post("/start-pulse")
@@ -38,7 +47,7 @@ def start_pulse_handler():
         result = start_pulse(pulse_data=pulse_data, table_name=START_PULSE_TABLE_NAME)
     except PulseCreationErrorAlreadyPresent as exc:
         logger.error(f"Pulse already exists: {str(exc)}")
-        raise BadRequestError(f"Pulse with ID {exc.pulse_id} already exists.")
+        raise BadRequestError(f"Pulse with ID {pulse_data.pulse_id} already exists.")
     except PulseCreationError as exc:
         logger.error(f"Pulse creation error: {str(exc)}")
         raise BadRequestError(f"Failed to create pulse: {str(exc)}")

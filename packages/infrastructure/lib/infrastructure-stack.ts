@@ -173,6 +173,11 @@ export class InfrastructureStack extends cdk.Stack {
         throttlingBurstLimit: 5,
       },
       apiKeySourceType: cdk.aws_apigateway.ApiKeySourceType.HEADER,
+      defaultCorsPreflightOptions: {
+        allowOrigins: cdk.aws_apigateway.Cors.ALL_ORIGINS,
+        allowMethods: cdk.aws_apigateway.Cors.ALL_METHODS,
+        allowHeaders: cdk.aws_apigateway.Cors.DEFAULT_HEADERS,
+      },
     });
 
     const apiKey = api.addApiKey('PulseApiKey', {
