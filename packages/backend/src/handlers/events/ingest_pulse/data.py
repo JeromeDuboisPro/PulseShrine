@@ -1,7 +1,6 @@
 import random
 from functools import cache
 from pydantic import BaseModel, Field
-from textblob import TextBlob  # type: ignore
 from typing import Any, Dict, Tuple
 
 
@@ -19,7 +18,7 @@ def _load_json_in_data_dir(file_name: str) -> Any:
     import json
     import os
 
-    json_file_path = os.path.join(_current_dir(), "..", "data", file_name)
+    json_file_path = os.path.join(_current_dir(), "data", file_name)
     with open(json_file_path, "r") as file:
         return json.load(file)
 
@@ -248,6 +247,8 @@ class SentimentAdjectives(BaseModel):
     @staticmethod
     def analyze_sentiment(text: str) -> Tuple[str, float]:
         """Analyze sentiment of reflection text."""
+        from textblob import TextBlob  # type: ignore
+
         if not text:
             return "neutral", 0.0
 

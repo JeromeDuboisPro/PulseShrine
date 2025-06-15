@@ -23,7 +23,7 @@ export class LambdaStack extends cdk.Stack {
         super(scope, id, props);
 
         const sharedLayer = new lambda.LayerVersion(this, 'SharedLayer', {
-            code: lambda.Code.fromAsset('../backend/src/shared'),
+            code: lambda.Code.fromAsset('../backend/src/shared/lambda_layer'),
             compatibleRuntimes: [lambda.Runtime.PYTHON_3_13],
             description: 'Shared dependencies layer',
         });

@@ -4,12 +4,38 @@ from mypy_boto3_dynamodb.service_resource import Table  # type: ignore
 from shared.services.aws import get_region_name
 
 
+def get_start_pulse_table_name() -> str:
+    """
+    Retrieve the name of the DynamoDB table used for storing pulses.
+
+    Returns:
+        str: The name of the DynamoDB table.
+    """
+    return "StartPulsesTable"  # Replace with your actual table name or configuration retrieval logic
+
+
+def get_stop_pulse_table_name() -> str:
+    """
+    Retrieve the name of the DynamoDB table used for storing pulses.
+
+    Returns:
+        str: The name of the DynamoDB table.
+    """
+    return "StopPulsesTable"  # Replace with your actual table name or configuration retrieval logic
+
+
+def get_ingested_pulse_table_name() -> str:
+    """
+    Retrieve the name of the DynamoDB table used for storing pulses.
+
+    Returns:
+        str: The name of the DynamoDB table.
+    """
+    return "IngestedPulsesTable"  # Replace with your actual table name or configuration retrieval logic
+
+
 def create_start_pulse_table() -> Table:
     """Create a mock DynamoDB table for pulse data."""
-    from shared.services.pulse import (
-        get_start_pulse_table_name,
-    )  # Replace with your actual import
-
     dynamodb_resource = boto3.resource("dynamodb", region_name=get_region_name())
     table = dynamodb_resource.create_table(
         TableName=get_start_pulse_table_name(),
@@ -28,9 +54,6 @@ def create_start_pulse_table() -> Table:
 
 def create_stop_pulse_table() -> Table:
     """Create a mock DynamoDB table for pulse data."""
-    from shared.services.pulse import (
-        get_stop_pulse_table_name,
-    )  # Replace with your actual import
 
     dynamodb_resource = boto3.resource("dynamodb", region_name=get_region_name())
     table = dynamodb_resource.create_table(
@@ -50,9 +73,6 @@ def create_stop_pulse_table() -> Table:
 
 def create_ingested_pulse_table() -> Table:
     """Create a mock DynamoDB table for pulse data."""
-    from shared.services.pulse import (
-        get_ingested_pulse_table_name,
-    )  # Replace with your actual import
 
     dynamodb_resource = boto3.resource("dynamodb", region_name=get_region_name())
     table = dynamodb_resource.create_table(

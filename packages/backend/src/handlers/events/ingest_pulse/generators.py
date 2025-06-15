@@ -1,8 +1,11 @@
 import random
 from typing import List
 
-from shared.models.data import IntensityLevels, IntentData, SentimentAdjectives
+from data import IntensityLevels, IntentData, SentimentAdjectives
 from shared.models.pulse import StopPulse
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class PulseTitleGenerator:

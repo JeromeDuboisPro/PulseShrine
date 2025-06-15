@@ -1,17 +1,19 @@
 import json
 import os
 from aws_lambda_powertools import Logger, Tracer
-from aws_lambda_powertools.utilities.batch import (BatchProcessor, EventType,
-                                                   process_partial_response)
-from aws_lambda_powertools.utilities.batch.types import \
-    PartialItemFailureResponse
+from aws_lambda_powertools.utilities.batch import (
+    BatchProcessor,
+    EventType,
+    process_partial_response,
+)
+from aws_lambda_powertools.utilities.batch.types import PartialItemFailureResponse
 from aws_lambda_powertools.utilities.data_classes.sqs_event import SQSRecord
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from boto3.dynamodb.types import TypeDeserializer
 from typing import Any, Dict
 
 from shared.models.pulse import StopPulse
-from shared.services.pulse import ingest_pulse
+from services import ingest_pulse
 
 # Initialize Powertools utilities
 logger = Logger()

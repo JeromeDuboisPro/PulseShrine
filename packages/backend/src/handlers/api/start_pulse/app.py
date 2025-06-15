@@ -10,10 +10,11 @@ from typing import Any
 
 from shared.models.pulse import (
     PulseCreationError,
-    PulseCreationErrorAlreadyPresent,
     StartPulse,
 )
-from shared.services.pulse import start_pulse, stop_pulse
+
+from models import PulseCreationErrorAlreadyPresent
+from services import start_pulse, stop_pulse
 
 # Initialize the logger
 logger = Logger()
