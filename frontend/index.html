@@ -1,6 +1,6 @@
-<!-- pulse_shrine_app.html -->
+<!-- index.html -->
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -10,7 +10,7 @@
 </head>
 <body>
     <div class="container">
-        <!-- Section haute - Sanctuaire -->
+        <!-- Upper section - Shrine -->
         <div class="shrine-section">
             <div class="bamboo-forest">
                 <div class="bamboo-stem bamboo-1"></div>
@@ -48,18 +48,18 @@
                 <div class="shrine-building">
                     <div class="shrine-roof"></div>
                     <div class="rune-hotel" id="runeHotel">
-                        <!-- Les emplacements de runes seront générés dynamiquement -->
+                        <!-- Rune slots will be generated dynamically -->
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Section basse - Chatbot -->
+        <!-- Lower section - Chatbot -->
         <div class="chat-section">
             <div class="sage-avatar">😌</div>
             <div class="chat-content">
                 <div class="sage-message" id="sageMessage">
-                    Bienvenue dans le Pulse Shrine, âme en quête de sérénité. Je suis le gardien de ce sanctuaire sacré. Ici, vos intentions prennent vie et se transforment en énergie positive. Êtes-vous prêt à commencer votre voyage intérieur ?
+                    Welcome to the Pulse Shrine, soul in search of serenity. I am the guardian of this sacred sanctuary. Here, your intentions come to life and transform into positive energy. Are you ready to begin your inner journey?
                 </div>
                 
                 <div id="pulseControls">
@@ -68,22 +68,22 @@
 
                 <div id="intentionPhase" class="hidden">
                     <div class="input-container">
-                        <textarea class="intention-input" id="intentionInput" placeholder="Partagez votre intention avec l'autel..."></textarea>
-                        <button class="validate-button" id="validateIntentionBtn">Confier mon intention</button>
+                        <textarea class="intention-input" id="intentionInput" placeholder="Share your intention with the altar..."></textarea>
+                        <button class="validate-button" id="validateIntentionBtn">Entrust my intention</button>
                     </div>
                 </div>
 
                 <div id="pulseActive" class="hidden">
                     <div class="pulse-status">
-                        ✨ Votre pulse résonne dans le sanctuaire... ✨
+                        ✨ Your pulse resonates in the shrine... ✨
                     </div>
-                    <button class="stop-button" id="stopPulseBtn">Arrêter le Pulse</button>
+                    <button class="stop-button" id="stopPulseBtn">Stop the Pulse</button>
                 </div>
 
                 <div id="reflectionPhase" class="hidden">
                     <div class="input-container">
-                        <textarea class="feeling-input" id="feelingInput" placeholder="Comment vous sentez-vous ? Votre intention s'est-elle concrétisée ?"></textarea>
-                        <button class="validate-button" id="validateFeelingBtn">Partager mon ressenti</button>
+                        <textarea class="feeling-input" id="feelingInput" placeholder="How do you feel? Did your intention come true?"></textarea>
+                        <button class="validate-button" id="validateFeelingBtn">Share my feeling</button>
                     </div>
                 </div>
             </div>

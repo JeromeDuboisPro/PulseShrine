@@ -17,7 +17,7 @@ body {
     flex-direction: column;
 }
 
-/* Section haute - Sanctuaire */
+/* Upper section - Shrine */
 .shrine-section {
     flex: 1;
     position: relative;
@@ -25,7 +25,7 @@ body {
     overflow: hidden;
 }
 
-/* Bambous en arrière-plan */
+/* Bamboo background */
 .bamboo-forest {
     position: absolute;
     width: 100%;
@@ -105,7 +105,7 @@ body {
     transform: rotate(2deg);
 }
 
-/* Nœuds des bambous */
+/* Bamboo nodes */
 .bamboo-stem::before {
     content: '';
     position: absolute;
@@ -130,7 +130,7 @@ body {
     box-shadow: 0 1px 2px rgba(0,0,0,0.3);
 }
 
-/* Feuilles de bambou */
+/* Bamboo leaves */
 .bamboo-leaves {
     position: absolute;
     width: 100%;
@@ -165,7 +165,7 @@ body {
     50% { transform: rotate(calc(var(--rotation, 0deg) + 10deg)) scale(1.05); }
 }
 
-/* Particules flottantes */
+/* Floating particles */
 .floating-particles {
     position: absolute;
     width: 100%;
@@ -193,7 +193,7 @@ body {
     50% { transform: translateY(-20px) translateX(10px); opacity: 0.8; }
 }
 
-/* Sanctuaire central */
+/* Central shrine */
 .shrine {
     position: absolute;
     top: 50%;
@@ -222,7 +222,7 @@ body {
     box-shadow: 0 5px 15px rgba(0,0,0,0.2);
 }
 
-/* Hôtel à runes */
+/* Rune hotel */
 .rune-hotel {
     display: grid;
     grid-template-columns: repeat(6, 1fr);
@@ -258,7 +258,7 @@ body {
     box-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
 }
 
-/* Rune de synthèse */
+/* Synthesis rune */
 .synthesis-rune-container {
     position: absolute;
     right: -100px;
@@ -315,7 +315,7 @@ body {
     }
 }
 
-/* Animation de félicitations */
+/* Congratulations animation */
 .enlightenment-animation {
     position: fixed;
     top: 0;
@@ -384,7 +384,7 @@ body {
     box-shadow: 0 8px 20px rgba(50, 205, 50, 0.4);
 }
 
-/* Section basse - Chatbot */
+/* Lower section - Chatbot */
 .chat-section {
     height: 300px;
     background: linear-gradient(135deg, #f5f5dc 0%, #fffacd 100%);
@@ -506,7 +506,7 @@ body {
     display: none;
 }
 
-/* Animations douces */
+/* Soft animations */
 .fade-in {
     animation: fadeIn 0.5s ease-in;
 }

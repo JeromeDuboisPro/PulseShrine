@@ -1,10 +1,10 @@
 import { config } from './pulse-config.js';
 
-// pulse_shrine_app.js
+// pulse.js
 
 let runes = [];
 
-// Initialiser l'hôtel à runes
+// Initialize the rune altar
 function initRuneHotel() {
     const nbRunes = 8;
     const hotel = document.getElementById('runeHotel');
@@ -16,7 +16,7 @@ function initRuneHotel() {
     }
 }
 
-// Créer une rune
+// Create a rune
 function createRune(intention, feeling) {
     const runeSymbols = ['☯', '✧', '◈', '※', '⟡', '◊', '⬟', '◈', '✦', '⟢', '◇', '※', '◉', '⬢', '◈', '⟡'];
     const symbol = runeSymbols[Math.floor(Math.random() * runeSymbols.length)];
@@ -31,7 +31,7 @@ function createRune(intention, feeling) {
     return rune;
 }
 
-// Générer un nom de rune
+// Generate a rune name
 function generateRuneName(intention, feeling) {
     const prefixes = ['Lum', 'Ser', 'Zen', 'Har', 'Paz', 'Aur', 'Vel', 'Lyr'];
     const suffixes = ['nis', 'ara', 'eth', 'ion', 'ora', 'ium', 'ael', 'ys'];
@@ -40,7 +40,7 @@ function generateRuneName(intention, feeling) {
     return prefix + suffix;
 }
 
-// Ajouter une rune à l'hôtel
+// Add a rune to the altar
 function addRuneToHotel(rune) {
     const emptySlots = document.querySelectorAll('.rune-slot:not(.filled)');
     if (emptySlots.length > 0) {
@@ -51,7 +51,7 @@ function addRuneToHotel(rune) {
     }
 }
 
-// Gestion des phases
+// Phase management
 function showMessage(message) {
     const sageMessage = document.getElementById('sageMessage');
     sageMessage.textContent = message;
@@ -101,35 +101,35 @@ async function callStopPulseAPI(user_id, reflection) {
     await callPulseAPI('/stop-pulse', { user_id: user_id, reflection: reflection });
 }
 
-// Initialisation après chargement du DOM
+// Initialization after DOM load
 document.addEventListener('DOMContentLoaded', function () {
     initRuneHotel();
 
-    // Phase 1: Démarrer un pulse
+    // Phase 1: Start a pulse
     document.getElementById('startPulseBtn').addEventListener('click', function () {
-        showMessage("Ah, je sens votre énergie s'éveiller... L'autel résonne : indiquez-lui votre intention.");
+        showMessage("Ah, I sense your energy awakening... The altar resonates: tell it your intention.");
         hideElement('pulseControls');
         showElement('intentionPhase');
     });
 
-    // Phase 2: Valider l'intention
+    // Phase 2: Validate intention
     document.getElementById('validateIntentionBtn').addEventListener('click', async function () {
         const intention = document.getElementById('intentionInput').value.trim();
         if (intention) {
-            showMessage("Votre intention s'élève vers les cieux... Le pulse commence à résonner dans tout le sanctuaire.");
+            showMessage("Your intention rises to the heavens... The pulse begins to resonate throughout the shrine.");
 
             // START the animation BEFORE the blocking call
             const shrineElement = document.querySelector('.shrine'); // or whatever your shrine element is
             shrineElement.classList.add('shrine-glow');
 
-            showMessage("Votre intention s'élève vers les cieux... Le pulse commence à résonner dans tout le sanctuaire.");
+            showMessage("Your intention rises to the heavens... The pulse begins to resonate throughout the shrine.");
             hideElement('intentionPhase');
 
             try {
                 await callStartPulseAPI("jerome", intention);
             } catch (error) {
                 // Handle any errors from the API call
-                showMessage("Une erreur s'est produite lors de l'envoi de votre intention. Veuillez réessayer.");
+                showMessage("An error occurred while sending your intention. Please try again.");
                 shrineElement.classList.remove('shrine-glow');
                 return;
             }
@@ -138,30 +138,30 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
-    // Phase 3: Arrêter le pulse
+    // Phase 3: Stop the pulse
     document.getElementById('stopPulseBtn').addEventListener('click', async function () {
-        showMessage("Le pulse s'apaise doucement... Partagez-moi maintenant votre ressenti, noble âme. Comment cette expérience vous a-t-elle transformé ?");
+        showMessage("The pulse gently subsides... Now share with me your feeling, noble soul. How did this experience transform you?");
         hideElement('pulseActive');
         showElement('reflectionPhase');
     });
 
-    // Phase 4: Finaliser et créer la rune
+    // Phase 4: Finalize and create the rune
     document.getElementById('validateFeelingBtn').addEventListener('click', async function () {
         const intention = document.getElementById('intentionInput').value.trim();
         const feeling = document.getElementById('feelingInput').value.trim();
-               const shrineElement = document.querySelector('.shrine'); // or whatever your shrine element is
+        const shrineElement = document.querySelector('.shrine'); // or whatever your shrine element is
         shrineElement.classList.remove('shrine-glow');
 
         try {
             await callStopPulseAPI("jerome", intention);
         } catch (error) {
             // Handle any errors from the API call
-            showMessage("Une erreur s'est produite lors de l'envoi de votre reflexion. Veuillez réessayer.");
+            showMessage("An error occurred while sending your reflection. Please try again.");
             return;
         }
         if (feeling) {
             const rune = createRune(intention, feeling);
-            showMessage(`Merveilleux... Votre énergie s'est cristallisée en une rune sacrée : "${rune.name}". Elle rejoindra l'hôtel de notre sanctuaire et continuera de rayonner votre intention. Vous pouvez maintenant commencer un nouveau pulse quand vous le souhaiterez.`);
+            showMessage(`Wonderful... Your energy has crystallized into a sacred rune: "${rune.name}". It will join the altar of our shrine and continue to radiate your intention. You can now start a new pulse whenever you wish.`);
             hideElement('reflectionPhase');
             showElement('pulseControls');
             document.getElementById('intentionInput').value = '';
