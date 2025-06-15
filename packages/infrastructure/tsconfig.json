@@ -5,6 +5,9 @@
     "lib": [
       "es2020"
     ],
+    "types": [
+      "node"
+    ],
     "declaration": true,
     "strict": true,
     "noImplicitAny": true,
@@ -19,16 +22,9 @@
     "inlineSources": true,
     "experimentalDecorators": true,
     "strictPropertyInitialization": false,
-    "typeRoots": [
-      "./node_modules/@types"
-    ],
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "types": [
-      "node",
-      "aws-cdk"
-    ],
   },
   "exclude": [
     "node_modules",
