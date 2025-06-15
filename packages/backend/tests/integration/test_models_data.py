@@ -1,5 +1,9 @@
-from src.shared.models.data import (IntensityLevels, IntentData,
-                                    MotivationalSuffixes, SentimentAdjectives)
+from shared.models.data import (
+    IntensityLevels,
+    IntentData,
+    MotivationalSuffixes,
+    SentimentAdjectives,
+)
 
 
 def test_intensity_levels():

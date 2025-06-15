@@ -5,9 +5,14 @@ from botocore.exceptions import BotoCoreError, ClientError
 from decimal import Decimal
 from typing import Any
 
-from shared.models.pulse import (ArchivedPulse, PulseCreationError,
-                                 PulseCreationErrorAlreadyPresent,
-                                 PulseDDBIngestionError, StartPulse, StopPulse)
+from shared.models.pulse import (
+    ArchivedPulse,
+    PulseCreationError,
+    PulseCreationErrorAlreadyPresent,
+    PulseDDBIngestionError,
+    StartPulse,
+    StopPulse,
+)
 from shared.services.aws import get_ddb_table
 from shared.services.generators import PulseTitleGenerator
 
