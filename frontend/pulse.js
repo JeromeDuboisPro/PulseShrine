@@ -1,6 +1,6 @@
 import { config } from './pulse-config.js';
 
-// pulse_shrine_app.js
+// pulse.js
 
 let runes = [];
 
