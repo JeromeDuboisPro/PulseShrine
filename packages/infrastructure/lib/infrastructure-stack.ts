@@ -198,8 +198,8 @@ export class InfrastructureStack extends cdk.Stack {
       api,
     });
 
-    const pulseResource = api.root.addResource('start-pulse');
-    pulseResource.addMethod('POST', new cdk.aws_apigateway.LambdaIntegration(pythonStartStopFunction), {
+    const startPulseResource = api.root.addResource('start-pulse');
+    startPulseResource.addMethod('POST', new cdk.aws_apigateway.LambdaIntegration(pythonStartStopFunction), {
       apiKeyRequired: true,
       requestModels: {
         'application/json': new cdk.aws_apigateway.Model(this, 'StartPulseRequestModel', {
@@ -225,8 +225,8 @@ export class InfrastructureStack extends cdk.Stack {
       },
     });
 
-    const StopPulseResource = api.root.addResource('stop-pulse');
-    StopPulseResource.addMethod('POST', new cdk.aws_apigateway.LambdaIntegration(pythonStartStopFunction), {
+    const stopPulseResource = api.root.addResource('stop-pulse');
+    stopPulseResource.addMethod('POST', new cdk.aws_apigateway.LambdaIntegration(pythonStartStopFunction), {
       apiKeyRequired: true,
       requestModels: {
         'application/json': new cdk.aws_apigateway.Model(this, 'StopPulseRequestModel', {
