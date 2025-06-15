@@ -10,7 +10,13 @@ import * as sqs from 'aws-cdk-lib/aws-sqs';
 import { Construct } from 'constructs';
 import * as path from 'path';
 
+
 export class InfrastructureStack extends cdk.Stack {
+  startPulseTable: cdk.aws_dynamodb.Table;
+  stopPulseTable: cdk.aws_dynamodb.Table;
+  ingestedPulseTable: cdk.aws_dynamodb.Table;
+  pulsesIngestionQueue: cdk.aws_sqs.Queue;
+  pulsesIngestionQueueDLQ: cdk.aws_sqs.Queue;
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
@@ -20,8 +26,8 @@ export class InfrastructureStack extends cdk.Stack {
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
     });
 
-    const stopPulseTable = new dynamodb.Table(this, 'StopPulseTableV4', {
-      tableName: 'stop-pulse-table-v4',
+    const stopPulseTable = new dynamodb.Table(this, 'StopPulseTable', {
+      tableName: 'stop-pulse-table',
       partitionKey: { name: 'pulse_id', type: dynamodb.AttributeType.STRING },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
       stream: dynamodb.StreamViewType.NEW_IMAGE,
@@ -42,37 +48,6 @@ export class InfrastructureStack extends cdk.Stack {
     });
 
 
-    const pythonStartStopFunction = new PythonFunction(this, 'StartPulse', {
-      entry: path.resolve('../backend/src'), // directory containing your .py file
-      index: 'handlers/api/start_pulse/app.py', // filename (default is 'index.py')
-      handler: 'handler', // function name in the .py file
-      architecture: lambda.Architecture.ARM_64, // optional, default is x86_64
-      runtime: lambda.Runtime.PYTHON_3_13,
-      timeout: cdk.Duration.seconds(5), // optional, default is 3 seconds
-      functionName: 'ps-start-stop-pulse',
-      description: 'Function to start & stop pulses',
-      logRetention: cdk.aws_logs.RetentionDays.FIVE_DAYS,
-      environment: {
-        START_PULSE_TABLE_NAME: startPulseTable.tableName,
-        STOP_PULSE_TABLE_NAME: stopPulseTable.tableName,
-      },
-      bundling: {
-        assetExcludes: [
-          // Exclude unnecessary files from the bundle
-          '**/__pycache__',
-          '**/*.pyc',
-          '**/*.pyo',
-          '**/*.pyd',
-          'shared/data',
-          'handlers/events',
-          'handlers/scheduled',
-        ]
-      },
-    });
-
-    startPulseTable.grantReadWriteData(pythonStartStopFunction);
-    stopPulseTable.grantReadWriteData(pythonStartStopFunction);
-
     // Create the DLQ
     const pulsesIngestionQueueDLQ = new sqs.Queue(this, 'pulsesIngestionQueueDLQ', {
       queueName: 'ps-pulse-ingestion-dlq',
@@ -89,51 +64,6 @@ export class InfrastructureStack extends cdk.Stack {
       },
     });
 
-    const pythonIngestPulseFunction = new PythonFunction(this, 'IngestPulse', {
-      entry: path.resolve('../backend/src'), // directory containing your .py file
-      index: 'handlers/events/ingest_pulse/app.py', // filename (default is 'index.py')
-      handler: 'handler', // function name in the .py file
-      architecture: lambda.Architecture.ARM_64, // optional, default is x86_64
-      runtime: lambda.Runtime.PYTHON_3_13,
-      timeout: cdk.Duration.seconds(60), // optional, default is 3 seconds
-      functionName: 'ps-ingest-pulse',
-      description: 'Function to ingest pulses',
-      logRetention: cdk.aws_logs.RetentionDays.FIVE_DAYS,
-      environment: {
-        STOP_PULSE_TABLE_NAME: stopPulseTable.tableName,
-        INGESTED_PULSE_TABLE_NAME: ingestedPulseTable.tableName,
-        SQS_QUEUE_ARN: pulsesIngestionQueue.queueArn, // will be set after queue creation
-        SQS_DLQ_ARN: pulsesIngestionQueueDLQ.queueArn,   // will be set after DLQ creation
-      },
-      bundling: {
-        assetExcludes: [
-
-          // Exclude unnecessary files from the bundle
-          '**/__pycache__/**',
-          '**/*.pyc',
-          '**/*.pyo',
-          '**/*.pyd',
-          'handlers/api/**',
-          'handlers/scheduled/**',
-        ]
-      },
-    });
-    stopPulseTable.grantWriteData(pythonIngestPulseFunction);
-    ingestedPulseTable.grantWriteData(pythonIngestPulseFunction)
-    // Grant Lambda permissions to read from the SQS queue
-    pulsesIngestionQueue.grantConsumeMessages(pythonIngestPulseFunction);
-
-    // Add SQS event source to the Lambda function
-    pythonIngestPulseFunction.addEventSource(
-      new SqsEventSource(pulsesIngestionQueue, {
-        batchSize: 20,
-        maxBatchingWindow: cdk.Duration.seconds(10),
-        enabled: true,
-        maxConcurrency: 2,
-      })
-    );
-
-
     // Create the DLQ for the DynamoDB Pipe
     const pulsesIngestionDDBDLQ = new sqs.Queue(this, 'pulsesIngestionDDBDLQ', {
       queueName: 'ps-pulse-ingestion-ddb-dlq',
@@ -141,7 +71,7 @@ export class InfrastructureStack extends cdk.Stack {
     });
 
     // Create the DynamoDB source
-    const pipeSource = new sources.DynamoDBSource(stopPulseTable, {
+    const pipeSourceV0 = new sources.DynamoDBSource(stopPulseTable, {
       startingPosition: sources.DynamoDBStartingPosition.LATEST,
       batchSize: 1,
       deadLetterTarget: pulsesIngestionDDBDLQ,
@@ -158,107 +88,18 @@ export class InfrastructureStack extends cdk.Stack {
       })
     ]);
 
-    // Create the pipe
-    new pipes.Pipe(this, 'StopPulseToSqsPipe', {
-      pipeName: 'stop-pulse-to-sqs-pipe-v1',
-      source: pipeSource,
+    new pipes.Pipe(this, 'StopPulseToSqsPipeV1', {
+      pipeName: 'stop-pulse-to-sqs-pipe',
+      source: pipeSourceV0,
       target: pipeTarget,
       filter: sourceFilter, // Apply the filter
     });
 
-    const api = new cdk.aws_apigateway.RestApi(this, 'PulseApi', {
-      restApiName: 'Pulse Service',
-      deployOptions: {
-        throttlingRateLimit: 5,
-        throttlingBurstLimit: 5,
-      },
-      apiKeySourceType: cdk.aws_apigateway.ApiKeySourceType.HEADER,
-      defaultCorsPreflightOptions: {
-        allowOrigins: cdk.aws_apigateway.Cors.ALL_ORIGINS,
-        allowMethods: cdk.aws_apigateway.Cors.ALL_METHODS,
-        allowHeaders: cdk.aws_apigateway.Cors.DEFAULT_HEADERS,
-      },
-    });
-
-    const apiKey = api.addApiKey('PulseApiKey', {
-      apiKeyName: 'PulseApiKey',
-      value: undefined,
-      description: 'API Key for Pulse API',
-    });
-
-    const usagePlan = api.addUsagePlan('PulseUsagePlan', {
-      name: 'PulseUsagePlan',
-      throttle: {
-        rateLimit: 5,
-        burstLimit: 5,
-      },
-      quota: {
-        limit: 500,
-        period: cdk.aws_apigateway.Period.DAY,
-      },
-    });
-    usagePlan.addApiKey(apiKey);
-    usagePlan.addApiStage({
-      stage: api.deploymentStage,
-      api,
-    });
-
-    const startPulseResource = api.root.addResource('start-pulse');
-    startPulseResource.addMethod('POST', new cdk.aws_apigateway.LambdaIntegration(pythonStartStopFunction), {
-      apiKeyRequired: true,
-      requestModels: {
-        'application/json': new cdk.aws_apigateway.Model(this, 'StartPulseRequestModel', {
-          restApi: api,
-          contentType: 'application/json',
-          modelName: 'StartPulseRequest',
-          schema: {
-            type: cdk.aws_apigateway.JsonSchemaType.OBJECT,
-            required: ['user_id', 'intent'],
-            properties: {
-              user_id: { type: cdk.aws_apigateway.JsonSchemaType.STRING },
-              start_time: { type: cdk.aws_apigateway.JsonSchemaType.STRING, format: 'date-time' },
-              intent: { type: cdk.aws_apigateway.JsonSchemaType.STRING },
-              duration_seconds: { type: cdk.aws_apigateway.JsonSchemaType.INTEGER },
-              tags: {
-                type: cdk.aws_apigateway.JsonSchemaType.ARRAY,
-                items: { type: cdk.aws_apigateway.JsonSchemaType.STRING },
-              },
-              is_public: { type: cdk.aws_apigateway.JsonSchemaType.BOOLEAN },
-            },
-          },
-        }),
-      },
-    });
-
-    const stopPulseResource = api.root.addResource('stop-pulse');
-    stopPulseResource.addMethod('POST', new cdk.aws_apigateway.LambdaIntegration(pythonStartStopFunction), {
-      apiKeyRequired: true,
-      requestModels: {
-        'application/json': new cdk.aws_apigateway.Model(this, 'StopPulseRequestModel', {
-          restApi: api,
-          contentType: 'application/json',
-          modelName: 'StopPulseRequest',
-          schema: {
-            type: cdk.aws_apigateway.JsonSchemaType.OBJECT,
-            required: ['user_id', 'reflexion'],
-            properties: {
-              user_id: { type: cdk.aws_apigateway.JsonSchemaType.STRING },
-              reflexion: { type: cdk.aws_apigateway.JsonSchemaType.STRING },
-            },
-          },
-        }),
-      },
-    });
-
-    new cdk.CfnOutput(this, 'StartPulseEndpointUrl', {
-      value: `${api.url}start-pulse`,
-      description: 'URL of the Start Pulse API endpoint',
-    });
-
-    new cdk.CfnOutput(this, 'StopPulseEndpointUrl', {
-      value: `${api.url}stop-pulse`,
-      description: 'URL of the Post Pulse API endpoint',
-    });
+    this.startPulseTable = startPulseTable;
+    this.stopPulseTable = stopPulseTable;
+    this.ingestedPulseTable = ingestedPulseTable;
+    this.pulsesIngestionQueue = pulsesIngestionQueue;
+    this.pulsesIngestionQueueDLQ = pulsesIngestionQueueDLQ;
 
   }
 }
