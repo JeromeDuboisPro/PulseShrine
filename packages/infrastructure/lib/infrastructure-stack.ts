@@ -20,13 +20,6 @@ export class InfrastructureStack extends cdk.Stack {
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
     });
 
-    const stopPulseTablev0 = new dynamodb.Table(this, 'StopPulseTable', {
-      tableName: 'stop-pulse-table',
-      partitionKey: { name: 'user_id', type: dynamodb.AttributeType.STRING },
-      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
-      stream: dynamodb.StreamViewType.NEW_IMAGE,
-    });
-
     const stopPulseTable = new dynamodb.Table(this, 'StopPulseTableV4', {
       tableName: 'stop-pulse-table-v4',
       partitionKey: { name: 'pulse_id', type: dynamodb.AttributeType.STRING },
