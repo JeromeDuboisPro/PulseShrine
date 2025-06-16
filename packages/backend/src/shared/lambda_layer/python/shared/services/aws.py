@@ -1,3 +1,4 @@
+from typing import Any
 import boto3
 import os
 from boto3.resources.base import ServiceResource
@@ -26,5 +27,5 @@ def get_dynamodb_resource() -> ServiceResource:
 
 
 @cache
-def get_ddb_table(table_name: str):
+def get_ddb_table(table_name: str) -> Any:
     return get_dynamodb_resource().Table(table_name)
