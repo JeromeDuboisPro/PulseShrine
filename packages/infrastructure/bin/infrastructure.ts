@@ -20,6 +20,7 @@ const lambdaStack = new LambdaStack(app, 'LambdaStack', {
 });
 
 new ApiGatewayStack(app, 'ApiGatewayStack', {
+  pythonGetStartPulseFunction: lambdaStack.pythonGetStartPulseFunction,
   pythonStartFunction: lambdaStack.pythonStartFunction,
   pythonStopFunction: lambdaStack.pythonStopFunction,
 });

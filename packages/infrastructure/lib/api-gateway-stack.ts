@@ -4,6 +4,7 @@ import * as apigateway from 'aws-cdk-lib/aws-apigateway';
 import { Construct } from 'constructs';
 
 interface ApiGatewayStackProps extends cdk.StackProps {
+    pythonGetStartPulseFunction: PythonFunction;
     pythonStartFunction: PythonFunction;
     pythonStopFunction: PythonFunction;
 }
@@ -98,6 +99,14 @@ export class ApiGatewayStack extends cdk.Stack {
             },
         });
 
+        const getStartPulseResource = api.root.addResource('get-start-pulse');
+        getStartPulseResource.addMethod('GET', new apigateway.LambdaIntegration(props.pythonGetStartPulseFunction), {
+            apiKeyRequired: true,
+            requestParameters: {
+                'method.request.querystring.user_id': true, // Require user_id as a query parameter
+            },
+        });
+
         new cdk.CfnOutput(this, 'StartPulseEndpointUrl', {
             value: `${api.url}start-pulse`,
             description: 'URL of the Start Pulse API endpoint',
@@ -106,6 +115,11 @@ export class ApiGatewayStack extends cdk.Stack {
         new cdk.CfnOutput(this, 'StopPulseEndpointUrl', {
             value: `${api.url}stop-pulse`,
             description: 'URL of the Stop Pulse API endpoint',
+        });
+
+        new cdk.CfnOutput(this, 'GetStartPulseEndpointUrl', {
+            value: `${api.url}get-start-pulse`,
+            description: 'URL of the Get Start Pulse API endpoint',
         });
 
         this.api = api;

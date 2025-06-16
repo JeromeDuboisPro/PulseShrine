@@ -19,6 +19,7 @@ export class LambdaStack extends cdk.Stack {
     public readonly pythonStartFunction: PythonFunction;
     public readonly pythonStopFunction: PythonFunction;
     public readonly pythonIngestPulseFunction: PythonFunction;
+    public readonly pythonGetStartPulseFunction: PythonFunction;
 
     constructor(scope: Construct, id: string, props: LambdaStackProps) {
         super(scope, id, props);
@@ -105,5 +106,17 @@ export class LambdaStack extends cdk.Stack {
                 maxConcurrency: 2,
             })
         );
+
+        this.pythonGetStartPulseFunction = new PythonFunction(this, 'GetStartPulse', {
+            ...commonLambdaProps,
+            entry: path.resolve('../backend/src/handlers/api/get_start_pulse'),
+            functionName: 'ps-get-start-pulse',
+            description: 'Function to get the start pulse',
+            logRetention: cdk.aws_logs.RetentionDays.FIVE_DAYS,
+            environment: {
+                START_PULSE_TABLE_NAME: props.startPulseTable.tableName,
+            },
+        });
+        props.startPulseTable.grantReadData(this.pythonGetStartPulseFunction);
     }
 }
