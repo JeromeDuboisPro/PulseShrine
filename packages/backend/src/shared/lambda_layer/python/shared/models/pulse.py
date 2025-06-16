@@ -1,6 +1,6 @@
 from datetime import datetime
 from functools import cached_property
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, computed_field
 from typing import List, Optional
 
 
@@ -103,6 +103,7 @@ class ArchivedPulse(StopPulse):
         description="Generated badge for the pulse, used for display purposes",
     )
 
+    @computed_field
     @cached_property
     def inverted_timestamp(self) -> int:
         """Return the stopped time 'reversed to optimize most recent search in ddb."""
