@@ -4,7 +4,8 @@ import * as apigateway from 'aws-cdk-lib/aws-apigateway';
 import { Construct } from 'constructs';
 
 interface ApiGatewayStackProps extends cdk.StackProps {
-    pythonStartStopFunction: PythonFunction;
+    pythonStartFunction: PythonFunction;
+    pythonStopFunction: PythonFunction;
 }
 
 export class ApiGatewayStack extends cdk.Stack {
@@ -51,7 +52,7 @@ export class ApiGatewayStack extends cdk.Stack {
         });
 
         const startPulseResource = api.root.addResource('start-pulse');
-        startPulseResource.addMethod('POST', new apigateway.LambdaIntegration(props.pythonStartStopFunction), {
+        startPulseResource.addMethod('POST', new apigateway.LambdaIntegration(props.pythonStartFunction), {
             apiKeyRequired: true,
             requestModels: {
                 'application/json': new apigateway.Model(this, 'StartPulseRequestModel', {
@@ -78,7 +79,7 @@ export class ApiGatewayStack extends cdk.Stack {
         });
 
         const stopPulseResource = api.root.addResource('stop-pulse');
-        stopPulseResource.addMethod('POST', new apigateway.LambdaIntegration(props.pythonStartStopFunction), {
+        stopPulseResource.addMethod('POST', new apigateway.LambdaIntegration(props.pythonStopFunction), {
             apiKeyRequired: true,
             requestModels: {
                 'application/json': new apigateway.Model(this, 'StopPulseRequestModel', {

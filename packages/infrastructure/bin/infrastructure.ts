@@ -13,12 +13,13 @@ const infraStack = new InfrastructureStack(app, 'InfrastructureStack', {
 // LambdaStack depends on resources from InfrastructureStack
 const lambdaStack = new LambdaStack(app, 'LambdaStack', {
   startPulseTable: infraStack.startPulseTable,
-  stopPulseTableV1: infraStack.stopPulseTable,
+  stopPulseTable: infraStack.stopPulseTable,
   ingestedPulseTable: infraStack.ingestedPulseTable,
   pulsesIngestionQueue: infraStack.pulsesIngestionQueue,
   pulsesIngestionQueueDLQ: infraStack.pulsesIngestionQueueDLQ,
 });
 
 new ApiGatewayStack(app, 'ApiGatewayStack', {
-  pythonStartStopFunction: lambdaStack.pythonStartStopFunction,
+  pythonStartFunction: lambdaStack.pythonStartFunction,
+  pythonStopFunction: lambdaStack.pythonStopFunction,
 });
