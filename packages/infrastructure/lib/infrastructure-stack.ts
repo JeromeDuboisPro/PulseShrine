@@ -1,14 +1,10 @@
-import { PythonFunction } from '@aws-cdk/aws-lambda-python-alpha';
 import * as pipes from '@aws-cdk/aws-pipes-alpha';
 import * as sources from '@aws-cdk/aws-pipes-sources-alpha';
 import * as targets from '@aws-cdk/aws-pipes-targets-alpha';
 import * as cdk from 'aws-cdk-lib';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
-import * as lambda from 'aws-cdk-lib/aws-lambda';
-import { SqsEventSource } from 'aws-cdk-lib/aws-lambda-event-sources';
 import * as sqs from 'aws-cdk-lib/aws-sqs';
 import { Construct } from 'constructs';
-import * as path from 'path';
 
 
 export class InfrastructureStack extends cdk.Stack {
@@ -31,6 +27,15 @@ export class InfrastructureStack extends cdk.Stack {
       partitionKey: { name: 'pulse_id', type: dynamodb.AttributeType.STRING },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
       stream: dynamodb.StreamViewType.NEW_IMAGE,
+    });
+
+    stopPulseTable.addGlobalSecondaryIndex({
+      indexName: "UserIdIndex",
+      partitionKey: {
+        name: "user_id",
+        type: dynamodb.AttributeType.STRING,
+      },
+      sortKey: { name: "stopped_at", type: dynamodb.AttributeType.STRING }
     });
 
     const ingestedPulseTable = new dynamodb.Table(this, 'IngestedPulseTable', {
