@@ -44,7 +44,7 @@ export class ApiGatewayStack extends cdk.Stack {
                 burstLimit: 5,
             },
             quota: {
-                limit: 500,
+                limit: 5000,
                 period: cdk.aws_apigateway.Period.DAY,
             },
         });
@@ -148,6 +148,23 @@ export class ApiGatewayStack extends cdk.Stack {
         new cdk.CfnOutput(this, 'GetIngestedPulsesEndpointUrl', {
             value: `${api.url}get-ingested-pulses`,
             description: 'URL of the Get Ingested Pulses API endpoint',
+        });
+
+        // Add CORS headers to all gateway responses (including 4XX and 5XX)
+        const corsResponseParameters = {
+            'gatewayresponse.header.Access-Control-Allow-Origin': "'*'",
+            'gatewayresponse.header.Access-Control-Allow-Headers': "'*'",
+            'gatewayresponse.header.Access-Control-Allow-Methods': "'GET,POST,OPTIONS'"
+        };
+
+        api.addGatewayResponse('Default4xx', {
+            type: apigateway.ResponseType.DEFAULT_4XX,
+            responseHeaders: corsResponseParameters,
+        });
+
+        api.addGatewayResponse('Default5xx', {
+            type: apigateway.ResponseType.DEFAULT_5XX,
+            responseHeaders: corsResponseParameters,
         });
 
         this.api = api;
