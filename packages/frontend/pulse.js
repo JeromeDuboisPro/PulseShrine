@@ -1,14 +1,46 @@
 import { config } from './pulse-config.js';
 
-// pulse.js
+// Constants
+const NB_RUNES = 8;
+const USER_ID = "jerome";
+const RUNE_SYMBOLS = ['☯', '✧', '◈', '※', '⟡', '◊', '⬟', '◈', '✦', '⟢', '◇', '※', '◉', '⬢', '◈', '⟡'];
+const RUNE_PREFIXES = ['Lum', 'Ser', 'Zen', 'Har', 'Paz', 'Aur', 'Vel', 'Lyr'];
+const RUNE_SUFFIXES = ['nis', 'ara', 'eth', 'ion', 'ora', 'ium', 'ael', 'ys'];
 
 let runes = [];
+let currentPulse = undefined;
+let currentIntention = undefined;
 
-// Initialize the rune altar
+// --- UI Helpers ---
+function $(id) {
+    return document.getElementById(id);
+}
+
+function showElement(id) {
+    $(id).classList.remove('hidden');
+}
+
+function hideElement(id) {
+    $(id).classList.add('hidden');
+}
+
+function setText(id, text) {
+    $(id).textContent = text;
+}
+
+function addClass(id, className) {
+    $(id).classList.add(className);
+}
+
+function removeClass(id, className) {
+    $(id).classList.remove(className);
+}
+
+// --- Rune Logic ---
 function initRuneHotel() {
-    const nbRunes = 8;
-    const hotel = document.getElementById('runeHotel');
-    for (let i = 0; i < nbRunes; i++) {
+    const hotel = $('runeHotel');
+    hotel.innerHTML = '';
+    for (let i = 0; i < NB_RUNES; i++) {
         const slot = document.createElement('div');
         slot.className = 'rune-slot';
         slot.id = `rune-slot-${i}`;
@@ -16,208 +48,156 @@ function initRuneHotel() {
     }
 }
 
-// Create a rune
 function createRune(intention, feeling) {
-    const runeSymbols = ['☯', '✧', '◈', '※', '⟡', '◊', '⬟', '◈', '✦', '⟢', '◇', '※', '◉', '⬢', '◈', '⟡'];
-    const symbol = runeSymbols[Math.floor(Math.random() * runeSymbols.length)];
-    const rune = {
-        symbol: symbol,
-        intention: intention,
-        feeling: feeling,
-        name: generateRuneName(intention, feeling)
-    };
+    const symbol = randomFrom(RUNE_SYMBOLS);
+    const name = generateRuneName();
+    const rune = { symbol, intention, feeling, name };
     runes.push(rune);
     addRuneToHotel(rune);
     return rune;
 }
 
-// Generate a rune name
-function generateRuneName(intention, feeling) {
-    const prefixes = ['Lum', 'Ser', 'Zen', 'Har', 'Paz', 'Aur', 'Vel', 'Lyr'];
-    const suffixes = ['nis', 'ara', 'eth', 'ion', 'ora', 'ium', 'ael', 'ys'];
-    const prefix = prefixes[Math.floor(Math.random() * prefixes.length)];
-    const suffix = suffixes[Math.floor(Math.random() * suffixes.length)];
-    return prefix + suffix;
+function generateRuneName() {
+    return randomFrom(RUNE_PREFIXES) + randomFrom(RUNE_SUFFIXES);
 }
 
-// Add a rune to the altar
 function addRuneToHotel(rune) {
-    const emptySlots = document.querySelectorAll('.rune-slot:not(.filled)');
-    if (emptySlots.length > 0) {
-        const slot = emptySlots[0];
-        slot.className = 'rune-slot filled';
-        slot.innerHTML = `<span class="rune-symbol">${rune.symbol}</span>`;
-        slot.title = `${rune.name} - ${rune.intention}`;
+    const emptySlot = document.querySelector('.rune-slot:not(.filled)');
+    if (emptySlot) {
+        emptySlot.classList.add('filled');
+        emptySlot.innerHTML = `<span class="rune-symbol">${rune.symbol}</span>`;
+        emptySlot.title = `${rune.name} - ${rune.intention}`;
     }
 }
 
-// Phase management
+function randomFrom(arr) {
+    return arr[Math.floor(Math.random() * arr.length)];
+}
+
+// --- API Logic ---
+async function callPulseAPI(method, endpoint, body) {
+    if (!config.apiKey || !config.apiBaseUrl) {
+        throw new Error('API configuration is missing.');
+    }
+    const url = new URL(config.apiBaseUrl + endpoint);
+    const options = {
+        method,
+        headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': config.apiKey
+        }
+    };
+    if (method === 'GET' && body && Object.keys(body).length) {
+        Object.entries(body).forEach(([k, v]) => url.searchParams.append(k, v));
+    } else if (method !== 'GET') {
+        options.body = JSON.stringify(body);
+    }
+    const response = await fetch(url, options);
+    if (!response.ok) {
+        if (response.status === 429) throw new Error('Too Many Requests');
+        throw new Error('Network response was not ok');
+    }
+    return response.json();
+}
+
+const PulseAPI = {
+    getStartPulse: (userId) => callPulseAPI('GET', '/get-start-pulse', { user_id: userId }),
+    getStopPulses: (userId) => callPulseAPI('GET', '/get-stop-pulses', { user_id: userId }),
+    getIngestedPulses: (userId) => callPulseAPI('GET', '/get-ingested-pulses', { user_id: userId }),
+    startPulse: (userId, intent) => callPulseAPI('POST', '/start-pulse', { user_id: userId, intent }),
+    stopPulse: (userId, reflection) => callPulseAPI('POST', '/stop-pulse', { user_id: userId, reflection })
+};
+
+// --- UI Phase Logic ---
 function showMessage(message) {
-    const sageMessage = document.getElementById('sageMessage');
-    sageMessage.textContent = message;
-    sageMessage.classList.add('fade-in');
+    setText('sageMessage', message);
+    addClass('sageMessage', 'fade-in');
 }
 
 function showIntent(message) {
-    const pulseIntent = document.getElementById('pulseIntent');
-    pulseIntent.textContent = message;
-    pulseIntent.classList.add('fade-in');
+    setText('pulseIntent', message);
+    addClass('pulseIntent', 'fade-in');
 }
 
-
-function showElement(elementId) {
-    document.getElementById(elementId).classList.remove('hidden');
+function resetInputs() {
+    $('intentionInput').value = '';
+    $('feelingInput').value = '';
 }
 
-function hideElement(elementId) {
-    document.getElementById(elementId).classList.add('hidden');
-}
-
-async function callPulseAPI(method, apiEndpoint, requestBody) {
-    if (!config.apiKey || !config.apiBaseUrl) {
-        throw new Error('API configuration is missing. Please config.');
-    }
-    try {
-        const fetchOptions = {
-            method,
-            headers: {
-            'Content-Type': 'application/json',
-            'x-api-key': config.apiKey
-            }
-        };
-
-        let url = `${config.apiBaseUrl}${apiEndpoint}`;
-
-        if (method === 'GET' && requestBody && Object.keys(requestBody).length > 0) {
-            // Append query params for GET
-            const params = new URLSearchParams(requestBody).toString();
-            url += `?${params}`;
-        } else if (method !== 'GET') {
-            fetchOptions.body = JSON.stringify(requestBody);
-        }
-        const response = await fetch(url, fetchOptions);
-
-        if (!response.ok) {
-            if (response.status == 429)
-                throw new Error('API answered Too Many requests');
-            throw new Error('Network response was not ok');
-        }
-
-        const data = await response.json();
-        console.log('Success:', data);
-        return data;
-    } catch (error) {
-        console.error('Error:', error);
-        throw error; // Re-throw the error to handle it in the calling function if needed
+function setShrineGlow(on) {
+    const shrine = document.querySelector('.shrine');
+    if (shrine) {
+        shrine.classList.toggle('shrine-glow', on);
     }
 }
 
-async function callGetStartPulseAPI(user_id) {
-    return await callPulseAPI('GET', '/get-start-pulse', { user_id: user_id });
-
-}
-
-async function callGetStopPulsesAPI(user_id) {
-    return await callPulseAPI('GET', '/get-stop-pulses', { user_id: user_id });
-}
-
-async function callGetIngestedPulsesAPI(user_id) {
-    return await callPulseAPI('GET', '/get-ingested-pulses', { user_id: user_id });
-}
-
-async function callStartPulseAPI(user_id, intention) {
-    return await callPulseAPI('POST', '/start-pulse', { user_id: user_id, intent: intention });
-}
-
-async function callStopPulseAPI(user_id, reflection) {
-    return await callPulseAPI('POST', '/stop-pulse', { user_id: user_id, reflection: reflection });
-}
-
-// Initialization after DOM load
-document.addEventListener('DOMContentLoaded', async function () {
+// --- Main Flow ---
+document.addEventListener('DOMContentLoaded', async () => {
     initRuneHotel();
-
-    let currentPulse = await callGetStartPulseAPI("jerome") || undefined;
-    console.log('GetStartPulse Result: ', currentPulse)
-    let intention = currentPulse ? currentPulse.intent : undefined;
-    console.log('Intention: ', intention)
+    try {
+        currentPulse = await PulseAPI.getStartPulse(USER_ID);
+        currentIntention = currentPulse?.intent;
+    } catch (e) {
+        currentPulse = undefined;
+        currentIntention = undefined;
+    }
 
     if (currentPulse) {
-        console.log('Hiding Start Inpulse Controls as there is already a Pulse occuring.')
         hideElement('sageMessage');
         hideElement('pulseControls');
-        showIntent(intention)
+        showIntent(currentIntention);
         showElement('pulseActive');
-    }
-    else {
-        document.getElementById('intentionInput').value = '';
-        document.getElementById('feelingInput').value = '';        
+    } else {
+        resetInputs();
         showElement('sageMessage');
-        showElement('pulseControls');        
-        //showMessage("Your intention rises to the heavens... The pulse begins to resonate throughout the shrine.");
+        showElement('pulseControls');
     }
 
-    // Phase 1: Start a pulse
-    document.getElementById('startPulseBtn').addEventListener('click', async function () {
+    // Start Pulse
+    $('startPulseBtn').addEventListener('click', () => {
         showMessage("Ah, I sense your energy awakening... The altar resonates: tell it your intention.");
         hideElement('pulseControls');
         hideElement('pulseActive');
-        
-        if (! currentPulse)
-            showElement('intentionPhase');
+        if (!currentPulse) showElement('intentionPhase');
     });
 
-    // Phase 2: Validate intention
-    document.getElementById('validateIntentionBtn').addEventListener('click', async function () {
-        intention = document.getElementById('intentionInput').value.trim();
-
-        if (intention) {
-            showMessage("Your intention rises to the heavens... The pulse begins to resonate throughout the shrine.");
-
-            // START the animation BEFORE the blocking call
-            const shrineElement = document.querySelector('.shrine'); // or whatever your shrine element is
-            shrineElement.classList.add('shrine-glow');
-
-            showMessage("Your intention rises to the heavens... The pulse begins to resonate throughout the shrine.");
-            hideElement('intentionPhase');
-
-            try {
-                currentPulse = await callStartPulseAPI("jerome", intention);
-                console.log('StartPulse Result:', currentPulse);
-                intention = currentPulse.intent || "Something went wrong when retrievieng intent :<"
-                showElement('sageMessage')
-            } catch (error) {
-                // Handle any errors from the API call
-                showMessage("An error occurred while sending your intention. Please try again.");
-                shrineElement.classList.remove('shrine-glow');
-                return;
-            }
-            //shrineElement.classList.remove('shrine-glow');
-            showIntent(intention)
-            showElement('pulseActive');
+    // Validate Intention
+    $('validateIntentionBtn').addEventListener('click', async () => {
+        const intention = $('intentionInput').value.trim();
+        if (!intention) return;
+        showMessage("Your intention rises to the heavens... The pulse begins to resonate throughout the shrine.");
+        setShrineGlow(true);
+        hideElement('intentionPhase');
+        try {
+            currentPulse = await PulseAPI.startPulse(USER_ID, intention);
+            currentIntention = currentPulse.intent;
+            showElement('sageMessage');
+        } catch (e) {
+            showMessage("An error occurred while sending your intention. Please try again.");
+            setShrineGlow(false);
+            return;
         }
+        showIntent(currentIntention);
+        showElement('pulseActive');
     });
 
-    // Phase 3: Stop the pulse
-    document.getElementById('stopPulseBtn').addEventListener('click', async function () {
+    // Stop Pulse
+    $('stopPulseBtn').addEventListener('click', () => {
         showMessage("The pulse gently subsides... Now share with me your feeling, noble soul. How did this experience transform you?");
         hideElement('pulseActive');
         showElement('reflectionPhase');
     });
 
-    // Phase 4: Finalize and create the rune
-    document.getElementById('validateFeelingBtn').addEventListener('click', async function () {
-        intention = intention || document.getElementById('intentionInput').value.trim();
-        const feeling = document.getElementById('feelingInput').value.trim();
-        const shrineElement = document.querySelector('.shrine'); // or whatever your shrine element is
-        shrineElement.classList.remove('shrine-glow');
-
+    // Validate Feeling
+    $('validateFeelingBtn').addEventListener('click', async () => {
+        const intention = currentIntention || $('intentionInput').value.trim();
+        const feeling = $('feelingInput').value.trim();
+        setShrineGlow(false);
         try {
-            await callStopPulseAPI("jerome", feeling);
+            await PulseAPI.stopPulse(USER_ID, feeling);
             currentPulse = undefined;
-            intention = undefined;
-        } catch (error) {
-            // Handle any errors from the API call
+            currentIntention = undefined;
+        } catch (e) {
             showMessage("An error occurred while sending your reflection. Please try again.");
             return;
         }
@@ -227,8 +207,7 @@ document.addEventListener('DOMContentLoaded', async function () {
             hideElement('reflectionPhase');
             showElement('sageMessage');
             showElement('pulseControls');
-            document.getElementById('intentionInput').value = '';
-            document.getElementById('feelingInput').value = '';
+            resetInputs();
         }
     });
 });
