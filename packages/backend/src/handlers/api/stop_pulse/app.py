@@ -62,7 +62,7 @@ def stop_pulse_handler():
         logger.error("Failed to post pulse due to invalid input data.")
         raise BadRequestError("Failed to post pulse. Please check the input data.")
 
-    return {"stop_pulse": result.model_dump(mode="json")}
+    return result.model_dump(mode="json")
 
 
 def handler(event: dict[str, Any], context: LambdaContext) -> dict[str, Any]:

@@ -58,7 +58,7 @@ def start_pulse_handler():
     if not result:
         logger.error("Failed to start pulse due to invalid input data.")
         raise BadRequestError("Failed to start pulse. Please check the input data.")
-    return {"start_pulse": result.model_dump(mode="json")}
+    return result.model_dump(mode="json")
 
 
 def handler(event: dict[str, Any], context: LambdaContext) -> dict[str, Any]:
