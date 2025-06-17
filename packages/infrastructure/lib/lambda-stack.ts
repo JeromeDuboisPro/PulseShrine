@@ -20,6 +20,8 @@ export class LambdaStack extends cdk.Stack {
     public readonly pythonStopFunction: PythonFunction;
     public readonly pythonIngestPulseFunction: PythonFunction;
     public readonly pythonGetStartPulseFunction: PythonFunction;
+    public readonly pythonGetStopPulsesFunction: PythonFunction;
+    public readonly pythonGetIngestedPulsesFunction: PythonFunction;
 
     constructor(scope: Construct, id: string, props: LambdaStackProps) {
         super(scope, id, props);
@@ -28,6 +30,7 @@ export class LambdaStack extends cdk.Stack {
             code: lambda.Code.fromAsset('../backend/src/shared/lambda_layer'),
             compatibleRuntimes: [lambda.Runtime.PYTHON_3_13],
             description: 'Shared dependencies layer',
+
         });
 
         const bundlingAssetExcludes = [
@@ -47,6 +50,7 @@ export class LambdaStack extends cdk.Stack {
                 assetExcludes: bundlingAssetExcludes
             },
             timeout: cdk.Duration.seconds(5),
+            memorySize: 1024,
         }
 
         this.pythonStartFunction = new PythonFunction(this, 'StartPulseV1', {
@@ -118,5 +122,29 @@ export class LambdaStack extends cdk.Stack {
             },
         });
         props.startPulseTable.grantReadData(this.pythonGetStartPulseFunction);
+
+        this.pythonGetStopPulsesFunction = new PythonFunction(this, 'GetStopPulses', {
+            ...commonLambdaProps,
+            entry: path.resolve('../backend/src/handlers/api/get_stop_pulse'),
+            functionName: 'ps-get-stop-pulses',
+            description: 'Function to get the stop pulses',
+            logRetention: cdk.aws_logs.RetentionDays.FIVE_DAYS,
+            environment: {
+                STOP_PULSE_TABLE_NAME: props.stopPulseTable.tableName,
+            },
+        });
+        props.stopPulseTable.grantReadData(this.pythonGetStopPulsesFunction);
+
+        this.pythonGetIngestedPulsesFunction = new PythonFunction(this, 'GetIngestedPulses', {
+            ...commonLambdaProps,
+            entry: path.resolve('../backend/src/handlers/api/get_ingested_pulse'),
+            functionName: 'ps-get-ingested-pulses',
+            description: 'Function to get the ingested pulses',
+            logRetention: cdk.aws_logs.RetentionDays.FIVE_DAYS,
+            environment: {
+                INGESTED_PULSE_TABLE_NAME: props.ingestedPulseTable.tableName,
+            },
+        });
+        props.ingestedPulseTable.grantReadData(this.pythonGetIngestedPulsesFunction);
     }
 }

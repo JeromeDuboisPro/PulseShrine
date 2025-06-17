@@ -5,6 +5,8 @@ import { Construct } from 'constructs';
 
 interface ApiGatewayStackProps extends cdk.StackProps {
     pythonGetStartPulseFunction: PythonFunction;
+    pythonGetStopPulsesFunction: PythonFunction;
+    pythonGetIngestedPulsesFunction: PythonFunction;
     pythonStartFunction: PythonFunction;
     pythonStopFunction: PythonFunction;
 }
@@ -107,6 +109,22 @@ export class ApiGatewayStack extends cdk.Stack {
             },
         });
 
+        const getStopPulsesResource = api.root.addResource('get-stop-pulses');
+        getStopPulsesResource.addMethod('GET', new apigateway.LambdaIntegration(props.pythonGetStopPulsesFunction), {
+            apiKeyRequired: true,
+            requestParameters: {
+                'method.request.querystring.user_id': true, // Require user_id as a query parameter
+            },
+        });
+
+        const getIngestedPulsesResource = api.root.addResource('get-ingested-pulses');
+        getIngestedPulsesResource.addMethod('GET', new apigateway.LambdaIntegration(props.pythonGetIngestedPulsesFunction), {
+            apiKeyRequired: true,
+            requestParameters: {
+                'method.request.querystring.user_id': true, // Require user_id as a query parameter
+            },
+        });
+
         new cdk.CfnOutput(this, 'StartPulseEndpointUrl', {
             value: `${api.url}start-pulse`,
             description: 'URL of the Start Pulse API endpoint',
@@ -120,6 +138,16 @@ export class ApiGatewayStack extends cdk.Stack {
         new cdk.CfnOutput(this, 'GetStartPulseEndpointUrl', {
             value: `${api.url}get-start-pulse`,
             description: 'URL of the Get Start Pulse API endpoint',
+        });
+
+        new cdk.CfnOutput(this, 'GetStopPulsesEndpointUrl', {
+            value: `${api.url}get-stop-pulses`,
+            description: 'URL of the Get Stop Pulses API endpoint',
+        });
+
+        new cdk.CfnOutput(this, 'GetIngestedPulsesEndpointUrl', {
+            value: `${api.url}get-ingested-pulses`,
+            description: 'URL of the Get Ingested Pulses API endpoint',
         });
 
         this.api = api;

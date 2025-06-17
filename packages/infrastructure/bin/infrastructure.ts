@@ -21,6 +21,8 @@ const lambdaStack = new LambdaStack(app, 'LambdaStack', {
 
 new ApiGatewayStack(app, 'ApiGatewayStack', {
   pythonGetStartPulseFunction: lambdaStack.pythonGetStartPulseFunction,
+  pythonGetStopPulsesFunction: lambdaStack.pythonGetStopPulsesFunction,
+  pythonGetIngestedPulsesFunction: lambdaStack.pythonGetIngestedPulsesFunction,
   pythonStartFunction: lambdaStack.pythonStartFunction,
   pythonStopFunction: lambdaStack.pythonStopFunction,
 });
