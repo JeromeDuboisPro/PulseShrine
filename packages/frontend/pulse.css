@@ -253,7 +253,7 @@ body {
 }
 
 .rune-slot.filled {
-    background: linear-gradient(135deg, #ffd700, #ffed4e);
+    background: linear-gradient(135deg, #ffffff, #b6ebec);
     border: 2px solid #ffd700;
     box-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
 }
