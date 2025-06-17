@@ -1,7 +1,7 @@
 import { config } from './pulse-config.js';
 
 // Constants
-const NB_RUNES = 8;
+const NB_RUNES = 18;
 const USER_ID = "jerome";
 const RUNE_SYMBOLS = ['☯', '✧', '◈', '※', '⟡', '◊', '⬟', '◈', '✦', '⟢', '◇', '※', '◉', '⬢', '◈', '⟡'];
 const RUNE_PREFIXES = ['Lum', 'Ser', 'Zen', 'Har', 'Paz', 'Aur', 'Vel', 'Lyr'];
@@ -10,6 +10,82 @@ const RUNE_SUFFIXES = ['nis', 'ara', 'eth', 'ion', 'ora', 'ium', 'ael', 'ys'];
 let runes = [];
 let currentPulse = undefined;
 let currentIntention = undefined;
+
+let ingestedPulses = [];
+let stoppedPulses = [];
+
+// Periodically fetch ingested pulses
+async function refreshPulses() {
+    try {
+        console.log("Retrieving Stop & IngestedPulses");
+        const [ingested, stopped] = await Promise.all([
+            PulseAPI.getIngestedPulses(USER_ID),
+            PulseAPI.getStopPulses(USER_ID)
+        ]);
+        ingestedPulses = ingested;
+        stoppedPulses = stopped;
+        console.log("Retrieved StoppedPulses", stoppedPulses);
+        console.log("Retrieved IngestedPulses", ingestedPulses);
+    } catch (e) {
+        // Optionally handle error
+    }
+}
+
+// Fill shrine with runes from ingestedPulses
+async function fillShrineWithIngestedPulses() {
+    await refreshPulses()
+    const hotel = $('runeHotel');
+    hotel.innerHTML = '';
+    // Create a list of stopped pulses whose pulse_id is not in ingestedPulses
+    const ingestedIdsSet = new Set(ingestedPulses.map(p => p.pulse_id));
+    const curatedStoppedPulses = stoppedPulses.filter(p => !ingestedIdsSet.has(p.pulse_id));
+
+    console.log("curatedStoppedPulses", curatedStoppedPulses);
+    console.log("stoppedPulses", stoppedPulses);
+    console.log("ingestedRunes", ingestedPulses);
+
+    let limitedIngestedPulses = ingestedPulses;
+    if (curatedStoppedPulses.length + ingestedPulses.length >= NB_RUNES) {
+        const limit = NB_RUNES - curatedStoppedPulses.length;
+        limitedIngestedPulses = ingestedPulses.slice(0, Math.max(0, limit));
+    }
+
+    // Display limitedIngestedPulses first
+    let runeIndex = 0;
+    for (; runeIndex < limitedIngestedPulses.length && runeIndex < NB_RUNES; runeIndex++) {
+        const pulse = limitedIngestedPulses[runeIndex];
+        const slot = document.createElement('div');
+        slot.className = 'rune-slot filled';
+        slot.id = `rune-slot-${runeIndex}`;
+        const badge = pulse.gen_badge;
+        const symbol = badge ? badge.trim().split(' ')[0] : randomFrom(RUNE_SYMBOLS);
+        slot.innerHTML = `<span class="rune-symbol">${symbol}</span>`;
+        slot.title = `${pulse.gen_title || 'Rune'} - ${pulse.intent || 'Intent went spiritual'} - ${pulse.reflection || 'Reflection is in progress'}`;
+        hotel.appendChild(slot);
+    }
+
+    // Then display curatedStoppedPulses
+    for (let j = 0; runeIndex < NB_RUNES && j < curatedStoppedPulses.length; j++, runeIndex++) {
+        const pulse = curatedStoppedPulses[j];
+        const slot = document.createElement('div');
+        slot.className = 'rune-slot filled-stop';
+        slot.id = `rune-slot-${runeIndex}`;
+        const badge = '🧘';
+        const symbol = badge ? badge.trim().split(' ')[0] : randomFrom(RUNE_SYMBOLS);
+        slot.innerHTML = `<span class="rune-symbol">${symbol}</span>`;
+        slot.title = `${pulse.gen_title || 'Rune'} - ${pulse.intent || 'Intent went spiritual'} - ${pulse.reflection || 'Reflection is in progress'}`;
+        hotel.appendChild(slot);
+    }
+
+    // Fill remaining slots as empty
+    for (; runeIndex < NB_RUNES; runeIndex++) {
+        const slot = document.createElement('div');
+        slot.className = 'rune-slot';
+        slot.id = `rune-slot-${runeIndex}`;
+        hotel.appendChild(slot);
+    }
+}
+
 
 // --- UI Helpers ---
 function $(id) {
@@ -37,24 +113,13 @@ function removeClass(id, className) {
 }
 
 // --- Rune Logic ---
-function initRuneHotel() {
-    const hotel = $('runeHotel');
-    hotel.innerHTML = '';
-    for (let i = 0; i < NB_RUNES; i++) {
-        const slot = document.createElement('div');
-        slot.className = 'rune-slot';
-        slot.id = `rune-slot-${i}`;
-        hotel.appendChild(slot);
-    }
+async function initRuneHotel() {
+    await fillShrineWithIngestedPulses();
+    return;
 }
 
-function createRune(intention, feeling) {
-    const symbol = randomFrom(RUNE_SYMBOLS);
-    const name = generateRuneName();
-    const rune = { symbol, intention, feeling, name };
-    runes.push(rune);
-    addRuneToHotel(rune);
-    return rune;
+async function createRune(intention, feeling) {
+    await fillShrineWithIngestedPulses();
 }
 
 function generateRuneName() {
@@ -133,6 +198,8 @@ function setShrineGlow(on) {
 
 // --- Main Flow ---
 document.addEventListener('DOMContentLoaded', async () => {
+    // Start periodic refresh
+    setInterval(refreshPulses, 60 * 1000);
     initRuneHotel();
     try {
         currentPulse = await PulseAPI.getStartPulse(USER_ID);
@@ -202,8 +269,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             return;
         }
         if (feeling) {
-            const rune = createRune(intention, feeling);
-            showMessage(`Wonderful... Your energy has crystallized into a sacred rune: "${rune.name}". It will join the altar of our shrine and continue to radiate your intention. You can now start a new pulse whenever you wish.`);
+            createRune(intention, feeling);
+            showMessage(`Wonderful... Your energy will cristalize in a sacred rune soon. It will join the altar of our shrine and continue to radiate your intention. You can now start a new pulse whenever you wish.`);
             hideElement('reflectionPhase');
             showElement('sageMessage');
             showElement('pulseControls');
