@@ -40,11 +40,11 @@ export class ApiGatewayStack extends cdk.Stack {
         const usagePlan = api.addUsagePlan('PulseUsagePlan', {
             name: 'PulseUsagePlan',
             throttle: {
-                rateLimit: 5,
-                burstLimit: 5,
+                rateLimit: 10,
+                burstLimit: 10,
             },
             quota: {
-                limit: 5000,
+                limit: 10000,
                 period: cdk.aws_apigateway.Period.DAY,
             },
         });
