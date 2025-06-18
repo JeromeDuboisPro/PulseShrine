@@ -180,6 +180,7 @@ body {
     background: rgba(255, 255, 255, 0.6);
     border-radius: 50%;
     animation: float 6s ease-in-out infinite;
+    opacity: 0;
 }
 
 .particle-1 { left: 20%; top: 80%; animation-delay: 0s; }
@@ -189,12 +190,26 @@ body {
 .particle-5 { left: 10%; top: 75%; animation-delay: 3s; }
 
 @keyframes float {
-    0%, 100% { transform: translateY(0px) translateX(0px); opacity: 0.3; }
-    50% { transform: translateY(-20px) translateX(10px); opacity: 0.8; }
+    0%, 100% { 
+        transform: translate(0, 0) scale(0.5);
+        opacity: 0;
+    }
+    25% { 
+        transform: translate(20px, -20px) scale(1);
+        opacity: 1;
+    }
+    50% { 
+        transform: translate(-15px, -25px) scale(0.8);
+        opacity: 0.7;
+    }
+    75% { 
+        transform: translate(-25px, 15px) scale(1.2);
+        opacity: 1;
+    }
 }
 
 /* Central shrine */
-.shrine {
+/* .shrine {
     position: absolute;
     top: 50%;
     left: 50%;
@@ -220,6 +235,89 @@ body {
     top: -20px;
     left: -10px;
     box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+} */
+
+/* Central shrine - Torii style */
+.shrine {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+}
+
+.shrine-building {
+    width: 400px;
+    height: 280px;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+/* Torii structure */
+.shrine-building::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 20px;
+    background: linear-gradient(135deg, #dc143c 0%, #b22222 50%, #8b0000 100%);
+    border-radius: 25px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+    z-index: 3;
+}
+
+.shrine-building::after {
+    content: '';
+    position: absolute;
+    top: 35px;
+    left: 20px;
+    right: 20px;
+    height: 16px;
+    background: linear-gradient(135deg, #dc143c 0%, #b22222 50%, #8b0000 100%);
+    border-radius: 20px;
+    box-shadow: 0 3px 12px rgba(0,0,0,0.3);
+    z-index: 3;
+}
+
+/* Torii pillars */
+.torii-pillar-left,
+.torii-pillar-right {
+    position: absolute;
+    width: 24px;
+    height: 220px;
+    background: linear-gradient(90deg, #dc143c 0%, #b22222 50%, #8b0000 100%);
+    border-radius: 12px;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.4);
+    top: 10px;
+}
+
+.torii-pillar-left {
+    left: 40px;
+}
+
+.torii-pillar-right {
+    right: 40px;
+}
+
+/* Pillar bases */
+.torii-pillar-left::after,
+.torii-pillar-right::after {
+    content: '';
+    position: absolute;
+    bottom: -10px;
+    left: -8px;
+    width: 40px;
+    height: 20px;
+    background: linear-gradient(135deg, #2c2c2c 0%, #1a1a1a 100%);
+    border-radius: 20px;
+    box-shadow: 0 3px 8px rgba(0,0,0,0.6);
+}
+
+.shrine-roof {
+    display: none;
 }
 
 /* Rune hotel */
@@ -230,7 +328,7 @@ body {
     padding: 20px;
     background: rgba(139, 69, 19, 0.8);
     border-radius: 10px;
-    margin-top: 10px;
+    margin-top: 50px;
     transition: all 1s ease;
 }
 
@@ -558,4 +656,41 @@ body {
         box-shadow: 0 0 40px rgba(0, 0, 0, 0.6);
         filter: brightness(1.1);
     }
+}
+
+/* Avatar avec animations subtiles */
+.sage-avatar.animated {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #daa520, #ffd700);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 40px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+    animation: gentle-glow 3s ease-in-out infinite;
+    position: relative;
+    overflow: hidden;
+}
+
+.sage-avatar.animated::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: conic-gradient(transparent, rgba(255,255,255,0.3), transparent);
+    animation: rotate 4s linear infinite;
+}
+
+@keyframes gentle-glow {
+    0%, 100% { box-shadow: 0 5px 15px rgba(0,0,0,0.2); }
+    50% { box-shadow: 0 8px 25px rgba(255,215,0,0.4); }
+}
+
+@keyframes rotate {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
 }
