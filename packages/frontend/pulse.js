@@ -7,7 +7,6 @@ const RUNE_SYMBOLS = ['☯', '✧', '◈', '※', '⟡', '◊', '⬟', '◈', '�
 const RUNE_PREFIXES = ['Lum', 'Ser', 'Zen', 'Har', 'Paz', 'Aur', 'Vel', 'Lyr'];
 const RUNE_SUFFIXES = ['nis', 'ara', 'eth', 'ion', 'ora', 'ium', 'ael', 'ys'];
 
-let runes = [];
 let currentPulse = undefined;
 let currentIntention = undefined;
 
@@ -17,13 +16,17 @@ let stoppedPulses = [];
 // Periodically fetch ingested pulses
 async function refreshPulses() {
     try {
-        console.log("Retrieving Stop & IngestedPulses");
-        const [ingested, stopped] = await Promise.all([
+        const now = new Date();
+        console.log(`[${now.toLocaleString()}] Retrieving Stop & IngestedPulses`);
+        const [ingested, stopped, started] = await Promise.all([
             PulseAPI.getIngestedPulses(USER_ID),
-            PulseAPI.getStopPulses(USER_ID)
+            PulseAPI.getStopPulses(USER_ID),
+            PulseAPI.getStartPulse(USER_ID)
         ]);
-        ingestedPulses = ingested;
+        currentPulse = started;
+        ingestedPulses = ingested.sort((a, b) => b.inverted_timestamp - a.inverted_timestamp);
         stoppedPulses = stopped;
+        console.log("Retrieved StoppedPulses", currentPulse);
         console.log("Retrieved StoppedPulses", stoppedPulses);
         console.log("Retrieved IngestedPulses", ingestedPulses);
     } catch (e) {
@@ -45,9 +48,15 @@ async function fillShrineWithIngestedPulses() {
     console.log("ingestedRunes", ingestedPulses);
 
     let limitedIngestedPulses = ingestedPulses;
-    if (curatedStoppedPulses.length + ingestedPulses.length >= NB_RUNES) {
-        const limit = NB_RUNES - curatedStoppedPulses.length;
-        limitedIngestedPulses = ingestedPulses.slice(0, Math.max(0, limit));
+    let limit = NB_RUNES - curatedStoppedPulses.length;
+    let totalAmountOfPulses = curatedStoppedPulses.length + ingestedPulses.length;
+
+    if (currentPulse) {
+        limit = limit - 1;
+        totalAmountOfPulses = totalAmountOfPulses + 1;
+    }
+    if (totalAmountOfPulses >= NB_RUNES) {
+        limitedIngestedPulses = ingestedPulses.slice(-Math.max(0, limit));
     }
 
     // Display limitedIngestedPulses first
@@ -70,11 +79,23 @@ async function fillShrineWithIngestedPulses() {
         const slot = document.createElement('div');
         slot.className = 'rune-slot filled-stop';
         slot.id = `rune-slot-${runeIndex}`;
-        const badge = '🧘';
+        const badge = '🟢';
         const symbol = badge ? badge.trim().split(' ')[0] : randomFrom(RUNE_SYMBOLS);
         slot.innerHTML = `<span class="rune-symbol">${symbol}</span>`;
         slot.title = `${pulse.gen_title || 'Rune'} - ${pulse.intent || 'Intent went spiritual'} - ${pulse.reflection || 'Reflection is in progress'}`;
         hotel.appendChild(slot);
+    }
+
+    if (currentPulse && runeIndex < NB_RUNES) {
+        const slot = document.createElement('div');
+        slot.className = 'rune-slot filled-start';
+        slot.id = `rune-slot-${runeIndex}`;
+        const badge = currentPulse.gen_badge || '⏳';
+        const symbol = badge.trim().split(' ')[0];
+        slot.innerHTML = `<span class="rune-symbol">${symbol}</span>`;
+        slot.title = `${currentPulse.gen_title || 'Active Rune'} - ${currentPulse.intent || 'Intent in progress'} - Pulse is active`;
+        hotel.appendChild(slot);
+        runeIndex++;
     }
 
     // Fill remaining slots as empty
@@ -199,7 +220,8 @@ function setShrineGlow(on) {
 // --- Main Flow ---
 document.addEventListener('DOMContentLoaded', async () => {
     // Start periodic refresh
-    setInterval(refreshPulses, 60 * 1000);
+    setInterval(() => { fillShrineWithIngestedPulses(); }, 60 * 1000);
+
     initRuneHotel();
     try {
         currentPulse = await PulseAPI.getStartPulse(USER_ID);
@@ -235,17 +257,17 @@ document.addEventListener('DOMContentLoaded', async () => {
         showMessage("Your intention rises to the heavens... The pulse begins to resonate throughout the shrine.");
         setShrineGlow(true);
         hideElement('intentionPhase');
+        showIntent(intention);
+        showElement('pulseActive');
+        showElement('sageMessage');
         try {
             currentPulse = await PulseAPI.startPulse(USER_ID, intention);
-            currentIntention = currentPulse.intent;
-            showElement('sageMessage');
         } catch (e) {
             showMessage("An error occurred while sending your intention. Please try again.");
             setShrineGlow(false);
             return;
         }
-        showIntent(currentIntention);
-        showElement('pulseActive');
+        fillShrineWithIngestedPulses();
     });
 
     // Stop Pulse
@@ -260,14 +282,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         const intention = currentIntention || $('intentionInput').value.trim();
         const feeling = $('feelingInput').value.trim();
         setShrineGlow(false);
-        try {
-            await PulseAPI.stopPulse(USER_ID, feeling);
-            currentPulse = undefined;
-            currentIntention = undefined;
-        } catch (e) {
-            showMessage("An error occurred while sending your reflection. Please try again.");
-            return;
-        }
+        currentPulse = undefined;
+        currentIntention = undefined;
         if (feeling) {
             createRune(intention, feeling);
             showMessage(`Wonderful... Your energy will cristalize in a sacred rune soon. It will join the altar of our shrine and continue to radiate your intention. You can now start a new pulse whenever you wish.`);
@@ -276,5 +292,13 @@ document.addEventListener('DOMContentLoaded', async () => {
             showElement('pulseControls');
             resetInputs();
         }
+        try {
+            await PulseAPI.stopPulse(USER_ID, feeling);
+
+        } catch (e) {
+            showMessage("An error occurred while sending your reflection. Please try again.");
+            return;
+        }
+        fillShrineWithIngestedPulses();
     });
 });
