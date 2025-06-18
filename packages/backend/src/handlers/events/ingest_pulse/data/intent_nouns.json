@@ -1,0 +1,60 @@
+{
+    "workout": [
+        "Session",
+        "Training",
+        "Exercise",
+        "Fitness Journey",
+        "Power Hour",
+        "Sweat Session"
+    ],
+    "meditation": [
+        "Mindfulness",
+        "Zen Moment",
+        "Inner Journey",
+        "Peace Session",
+        "Calm Period"
+    ],
+    "study": [
+        "Learning Sprint",
+        "Knowledge Quest",
+        "Study Session",
+        "Brain Training",
+        "Focus Time"
+    ],
+    "work": [
+        "Productivity Burst",
+        "Work Flow",
+        "Task Conquest",
+        "Achievement Run",
+        "Focus Session"
+    ],
+    "reading": [
+        "Literary Journey",
+        "Page Turner",
+        "Knowledge Dive",
+        "Reading Adventure",
+        "Book Session"
+    ],
+    "creative": [
+        "Creative Flow",
+        "Inspiration Wave",
+        "Art Session",
+        "Creative Burst",
+        "Imagination Time"
+    ],
+    "coding": [
+        "Code Sprint",
+        "Debug Quest",
+        "Programming Flow",
+        "Tech Journey",
+        "Build Session"
+    ],
+    "default": [
+        "Journey",
+        "Session",
+        "Adventure",
+        "Quest",
+        "Experience",
+        "Moment"
+    ]
+}

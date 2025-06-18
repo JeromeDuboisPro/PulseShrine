@@ -1,0 +1,8 @@
+aws-lambda-powertools[parser]
+aws_xray_sdk
+boto3
+pydantic
+textblob
+emoji
+fuzzywuzzy
+python-Levenshtein
