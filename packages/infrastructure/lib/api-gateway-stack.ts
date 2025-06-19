@@ -125,30 +125,6 @@ export class ApiGatewayStack extends cdk.Stack {
             },
         });
 
-        new cdk.CfnOutput(this, 'StartPulseEndpointUrl', {
-            value: `${api.url}start-pulse`,
-            description: 'URL of the Start Pulse API endpoint',
-        });
-
-        new cdk.CfnOutput(this, 'StopPulseEndpointUrl', {
-            value: `${api.url}stop-pulse`,
-            description: 'URL of the Stop Pulse API endpoint',
-        });
-
-        new cdk.CfnOutput(this, 'GetStartPulseEndpointUrl', {
-            value: `${api.url}get-start-pulse`,
-            description: 'URL of the Get Start Pulse API endpoint',
-        });
-
-        new cdk.CfnOutput(this, 'GetStopPulsesEndpointUrl', {
-            value: `${api.url}get-stop-pulses`,
-            description: 'URL of the Get Stop Pulses API endpoint',
-        });
-
-        new cdk.CfnOutput(this, 'GetIngestedPulsesEndpointUrl', {
-            value: `${api.url}get-ingested-pulses`,
-            description: 'URL of the Get Ingested Pulses API endpoint',
-        });
 
         // Add CORS headers to all gateway responses (including 4XX and 5XX)
         const corsResponseParameters = {
@@ -168,5 +144,11 @@ export class ApiGatewayStack extends cdk.Stack {
         });
 
         this.api = api;
+
+        new cdk.CfnOutput(this, 'PulseApiKeyOutput', {
+            value: apiKey.keyId,
+            description: 'The API Key for the Pulse API',
+            exportName: 'PulseApiKey',
+        });
     }
 }
