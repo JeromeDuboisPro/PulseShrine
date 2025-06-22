@@ -38,6 +38,7 @@ export class LambdaStack extends cdk.Stack {
             '**/*.pyc',
             '**/*.pyo',
             '**/*.pyd',
+            '**/.pytest_cache'
         ]
 
         const commonLambdaProps = {
