@@ -4,7 +4,7 @@ from aws_lambda_powertools.event_handler import APIGatewayRestResolver
 from aws_lambda_powertools.event_handler.api_gateway import CORSConfig
 from aws_lambda_powertools.event_handler.exceptions import BadRequestError
 from aws_lambda_powertools.utilities.typing import LambdaContext
-from datetime import datetime
+from datetime import datetime, timezone
 from pydantic import BaseModel, ValidationError
 from typing import Any
 
@@ -36,7 +36,7 @@ class StopPulseRequest(BaseModel):
         """Return the stopped_at time in ISO format."""
         if self.stopped_at:
             return datetime.fromisoformat(self.stopped_at)
-        return datetime.now()
+        return datetime.now(timezone.utc)
 
 
 @app.post("/stop-pulse")
