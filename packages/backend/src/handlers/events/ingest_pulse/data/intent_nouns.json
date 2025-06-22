@@ -49,6 +49,41 @@
         "Tech Journey",
         "Build Session"
     ],
+    "music": [
+        "Jam Session",
+        "Music Flow",
+        "Sound Journey",
+        "Melody Moment",
+        "Rhythm Ride"
+    ],
+    "cooking": [
+        "Culinary Adventure",
+        "Cooking Session",
+        "Kitchen Quest",
+        "Recipe Run",
+        "Flavor Journey"
+    ],
+    "gaming": [
+        "Game Session",
+        "Play Quest",
+        "Level Run",
+        "Victory Sprint",
+        "Challenge Time"
+    ],
+    "social": [
+        "Hangout",
+        "Meetup",
+        "Social Hour",
+        "Connection Time",
+        "Gathering"
+    ],
+    "travel": [
+        "Trip",
+        "Excursion",
+        "Exploration",
+        "Voyage",
+        "Travel Session"
+    ],
     "default": [
         "Journey",
         "Session",

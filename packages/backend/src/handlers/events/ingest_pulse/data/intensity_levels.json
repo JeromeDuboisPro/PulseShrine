@@ -21,7 +21,7 @@
     },
     "major": {
         "min_duration": 1800,
-        "max_duration": 7200,
+        "max_duration": 3600,
         "prefix": [
             "Great",
             "Strong",
@@ -29,8 +29,18 @@
             "Powerful"
         ]
     },
+    "grand": {
+        "min_duration": 3600,
+        "max_duration": 7200,
+        "prefix": [
+            "Grand",
+            "Mighty",
+            "Outstanding",
+            "Remarkable"
+        ]
+    },
     "epic": {
-        "min_duration": 7200,
+        "min_duration": 21600,
         "max_duration": 9223372036854775807,
         "prefix": [
             "Epic",

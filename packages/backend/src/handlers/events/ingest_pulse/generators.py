@@ -40,10 +40,19 @@ class PulseTitleGenerator:
 
             title = random.choice(title_templates)
 
-            # Add duration context for very short or very long sessions
+            # Add duration context for different session lengths
             if duration < 60:
                 title += f" (Quick {int(duration)}s burst!)"
-            elif duration > 7200:  # 2 hours
+            elif 60 <= duration < 1200:
+                minutes = duration / 60
+                title += f" ({minutes:.0f} min session!)"
+            elif 1200 <= duration < 3600:
+                minutes = duration / 60
+                title += f" (Focused {minutes:.0f} min streak!)"
+            elif 3600 <= duration < 7200:
+                hours = duration / 3600
+                title += f" (Power {hours:.1f}h session!)"
+            elif duration >= 7200:
                 hours = duration / 3600
                 title += f" ({hours:.1f}h marathon!)"
 
@@ -67,18 +76,22 @@ class PulseTitleGenerator:
         duration = pulse_data.duration_seconds
         duration = duration if duration is not None else 0
         intent_category = IntentData.extract_intent_category(pulse_data.intent)
-
         badges = {
             ("workout", "epic"): "🏆 Fitness Warrior",
             ("workout", "major"): "💪 Strong Performer",
+            ("workout", "grand"): "🥇 Grand Fitness Champion",
             ("meditation", "major"): "🧘‍♀️ Zen Master",
             ("meditation", "epic"): "☮️ Inner Peace Champion",
+            ("meditation", "grand"): "🌌 Grand Zen Sage",
             ("study", "epic"): "🎓 Knowledge Seeker",
             ("study", "major"): "📚 Learning Champion",
+            ("study", "grand"): "🏅 Grand Scholar",
             ("work", "epic"): "🚀 Productivity Hero",
             ("work", "major"): "⚡ Task Crusher",
+            ("work", "grand"): "🏆 Grand Productivity Master",
             ("coding", "epic"): "💻 Code Ninja",
             ("coding", "major"): "🛠️ Bug Slayer",
+            ("coding", "grand"): "🏅 Grand Code Architect",
         }
 
         duration_level = IntensityLevels.get_duration_level(duration).name.lower()
