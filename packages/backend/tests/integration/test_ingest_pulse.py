@@ -2,11 +2,16 @@ import datetime
 from moto import mock_aws
 
 from shared.models.pulse import StartPulse
-from shared.services.generators import PulseTitleGenerator
-from shared.services.pulse import ingest_pulse, start_pulse, stop_pulse
-from tests.fixtures.ddb import (create_ingested_pulse_table,
-                                create_start_pulse_table,
-                                create_stop_pulse_table)
+
+from src.handlers.events.ingest_pulse.generators import PulseTitleGenerator
+from src.handlers.api.start_pulse.services import start_pulse
+from src.handlers.api.stop_pulse.services import stop_pulse
+from src.handlers.events.ingest_pulse.services import ingest_pulse
+from tests.fixtures.ddb import (
+    create_ingested_pulse_table,
+    create_start_pulse_table,
+    create_stop_pulse_table,
+)
 
 
 @mock_aws

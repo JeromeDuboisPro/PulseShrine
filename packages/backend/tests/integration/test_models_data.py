@@ -1,4 +1,4 @@
-from shared.models.data import (
+from src.handlers.events.ingest_pulse.data import (
     IntensityLevels,
     IntentData,
     MotivationalSuffixes,
