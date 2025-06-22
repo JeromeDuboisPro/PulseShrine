@@ -15,7 +15,7 @@ class PulseTitleGenerator:
     def generate_title(pulse_data: StopPulse) -> str:
         """Generate a gamified title for the pulse."""
         # Extract data
-        duration = pulse_data.duration_seconds or 0
+        duration = pulse_data.actual_duration_seconds
         intent = pulse_data.intent
         reflection = pulse_data.reflection
 
