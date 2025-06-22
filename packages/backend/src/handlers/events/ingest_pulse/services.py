@@ -121,15 +121,7 @@ def ingest_pulse(
     logger.info(f"Generated badge for pulse {stop_pulse.valid_pulse_id}: {badge}")
     # Store the ingested pulse in the ingested pulses table
     archived_pulse = ArchivedPulse(
-        user_id=stop_pulse.user_id,
-        pulse_id=stop_pulse.pulse_id,
-        start_time=stop_pulse.start_time,
-        intent=stop_pulse.intent,
-        reflection=stop_pulse.reflection,
-        stopped_at=stop_pulse.stopped_at,
-        duration_seconds=stop_pulse.duration_seconds,
-        tags=stop_pulse.tags,
-        is_public=stop_pulse.is_public,
+        **stop_pulse.model_dump(),
         archived_at=datetime.datetime.now(datetime.timezone.utc).isoformat(),
         gen_title=generated_title,
         gen_badge=badge,

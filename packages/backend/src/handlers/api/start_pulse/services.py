@@ -36,11 +36,13 @@ def start_pulse(
         # Convert datetime to UTC ISO format string for DynamoDB
         if pulse_data.start_time_dt.tzinfo is None:
             # If naive datetime, assume it's UTC
-            start_time_utc = pulse_data.start_time_dt.replace(tzinfo=datetime.timezone.utc)
+            start_time_utc = pulse_data.start_time_dt.replace(
+                tzinfo=datetime.timezone.utc
+            )
         else:
             # Convert to UTC if timezone-aware
             start_time_utc = pulse_data.start_time_dt.astimezone(datetime.timezone.utc)
-        
+
         start_time_iso = start_time_utc.isoformat()
         created_at = datetime.datetime.now(datetime.timezone.utc).isoformat()
 
@@ -59,6 +61,8 @@ def start_pulse(
         if pulse_data.duration_seconds is not None:
             # Convert to Decimal for DynamoDB compatibility
             item["duration_seconds"] = Decimal(str(pulse_data.duration_seconds))
+
+        item["intent_emotion"] = pulse_data.intent_emotion or "neutral"
 
         if pulse_data.tags:
             item["tags"] = pulse_data.tags

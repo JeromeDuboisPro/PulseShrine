@@ -29,6 +29,7 @@ app = APIGatewayRestResolver(cors=cors_config)
 class StopPulseRequest(BaseModel):
     user_id: str
     reflection: str
+    reflection_emotion: str | None = None
     stopped_at: str | None = None
 
     def stopped_at_dt(self) -> datetime:
@@ -53,6 +54,7 @@ def stop_pulse_handler():
     result = stop_pulse(
         user_id=stop_pulse_data.user_id,
         reflection=stop_pulse_data.reflection,
+        reflection_emotion=stop_pulse_data.reflection_emotion,
         stopped_at=stop_pulse_data.stopped_at_dt(),
         start_pulse_table_name=START_PULSE_TABLE_NAME,
         stop_pulse_table_name=STOP_PULSE_TABLE_NAME,

@@ -88,6 +88,7 @@ def stop_pulse(
     stop_pulse_table_name: str,
     reflection: str,
     stopped_at: datetime.datetime,
+    reflection_emotion: str | None = None,
 ) -> StopPulse | None:
     """
     Stop a pulse for the given user by removing it from the DynamoDB table.
@@ -117,8 +118,10 @@ def stop_pulse(
         start_time=_pulse["start_time"],
         intent=_pulse["intent"],
         reflection=reflection,
+        reflection_emotion=reflection_emotion,
         stopped_at=stopped_at.isoformat(),
         duration_seconds=_pulse.get("duration_seconds"),
+        intent_emotion=_pulse.get("intent_emotion"),
         tags=_pulse.get("tags"),
         is_public=_pulse.get("is_public", False),
     )

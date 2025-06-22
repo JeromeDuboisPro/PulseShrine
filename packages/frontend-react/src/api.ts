@@ -9,6 +9,7 @@ export interface StartPulse {
   inverted_timestamp?: number;
   start_time?: string;
   duration_seconds?: number;
+  intent_emotion?: string;
   gen_title?: string;
   gen_badge?: string;
 }
@@ -18,9 +19,11 @@ export interface StopPulse {
   user_id: string;
   intent: string;
   reflection: string;
+  reflection_emotion?: string;
   timestamp: number;
   inverted_timestamp: number;
   duration_seconds?: number;
+  intent_emotion?: string;
   gen_title?: string;
   gen_badge?: string;
 }
@@ -30,9 +33,11 @@ export interface IngestedPulse {
   user_id: string;
   intent: string;
   reflection: string;
+  reflection_emotion?: string;
   timestamp: number;
   inverted_timestamp: number;
   duration_seconds?: number;
+  intent_emotion?: string;
   gen_title: string;
   gen_badge: string;
   gen_rune_name?: string;
@@ -159,7 +164,7 @@ export const PulseAPI = {
   },
 
   // Start a new pulse
-  startPulse: async (userId: string, intent: string, durationSeconds?: number): Promise<StartPulse> => {
+  startPulse: async (userId: string, intent: string, durationSeconds?: number, intentEmotion?: string): Promise<StartPulse> => {
     if (!intent.trim()) {
       throw new ApiError('Intention cannot be empty', 400, 'INVALID_INPUT');
     }
@@ -173,14 +178,24 @@ export const PulseAPI = {
       payload.duration_seconds = durationSeconds;
     }
     
+    if (intentEmotion) {
+      payload.intent_emotion = intentEmotion;
+    }
+    
     return await callPulseAPI<StartPulse>('POST', '/start-pulse', payload);
   },
 
   // Stop active pulse
-  stopPulse: async (userId: string, reflection: string): Promise<StopPulse> => {
-    return await callPulseAPI<StopPulse>('POST', '/stop-pulse', {
+  stopPulse: async (userId: string, reflection: string, reflectionEmotion?: string): Promise<StopPulse> => {
+    const payload: any = {
       user_id: userId,
       reflection: reflection.trim()
-    });
+    };
+    
+    if (reflectionEmotion) {
+      payload.reflection_emotion = reflectionEmotion;
+    }
+    
+    return await callPulseAPI<StopPulse>('POST', '/stop-pulse', payload);
   }
 };

@@ -19,6 +19,9 @@ class PulseBase(BaseModel):
         description="Start time of the pulse, defaults to UTC now if not provided",
     )
     duration_seconds: Optional[int] = Field(default=None)
+    intent_emotion: Optional[str] = Field(
+        default=None, description="Energy type for the pulse (creation, focus, etc.)"
+    )
     tags: Optional[List[str]] = Field(default=None)
     is_public: bool = Field(default=False)
 
@@ -69,6 +72,9 @@ class StartPulse(PulseBase):
 
 class StopPulse(PulseBase):
     reflection: str
+    reflection_emotion: Optional[str] = Field(
+        default=None, description="Emotion felt after completing the pulse"
+    )
     stopped_at: Optional[datetime | str] = Field(
         default_factory=lambda: datetime.now(timezone.utc),
         description="Stop time of the pulse, defaults to UTC now if not provided",

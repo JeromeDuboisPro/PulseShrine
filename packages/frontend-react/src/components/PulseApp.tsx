@@ -199,7 +199,7 @@ export const PulseApp: React.FC<PulseAppProps> = ({ config, onReconfigure }) => 
     setError(null);
     
     try {
-      const pulse = await PulseAPI.startPulse(userIdRef.current, intention, duration * 60);
+      const pulse = await PulseAPI.startPulse(userIdRef.current, intention, duration * 60, selectedEnergy);
       setActivePulse(pulse);
       setTimeLeft(duration * 60);
       setCurrentView('timer');
@@ -238,14 +238,14 @@ export const PulseApp: React.FC<PulseAppProps> = ({ config, onReconfigure }) => 
     }
   };
 
-  const submitEmotion = async (_emotion: string, reflection = '') => {
+  const submitEmotion = async (emotion: string, reflection = '') => {
     if (!activePulse) return;
     
     setIsLoading(true);
     setError(null);
     
     try {
-      await PulseAPI.stopPulse(userIdRef.current, reflection);
+      await PulseAPI.stopPulse(userIdRef.current, reflection, emotion);
       
       // Reset state
       setActivePulse(null);
@@ -309,14 +309,15 @@ export const PulseApp: React.FC<PulseAppProps> = ({ config, onReconfigure }) => 
     let displayPulses = [...completedPulses];
     const maxRunes = 18;
     
-    // Add stopped pulses that haven't been ingested yet
+    // Add stopped pulses that haven't been ingested yet (processing state)
     curatedStoppedPulses.forEach(pulse => {
       if (displayPulses.length < maxRunes) {
         displayPulses.push({
           ...pulse,
-          gen_title: pulse.gen_title || 'Processing...',
-          gen_badge: '🟢'
-        } as IngestedPulse);
+          gen_title: pulse.gen_title || '⚡ Processing...',
+          gen_badge: '⏳', // Processing indicator
+          processing: true // Add flag to identify processing pulses
+        } as IngestedPulse & { processing: boolean });
       }
     });
 
@@ -425,24 +426,38 @@ export const PulseApp: React.FC<PulseAppProps> = ({ config, onReconfigure }) => 
                   {/* Show completed pulses */}
                   {displayPulses.map((pulse, index) => {
                     const symbol = pulse.gen_badge?.trim().split(' ')[0] || '✨';
+                    const isProcessing = (pulse as any).processing;
                     return (
                       <div key={pulse.pulse_id} className="group flex items-center justify-center">
                         <div className="relative">
                           <div 
-                            className="bg-gradient-to-br from-white/80 to-slate-50/80 backdrop-blur-sm p-3 rounded-full border border-slate-200/50 hover:shadow-lg transition-all duration-500 cursor-pointer group-hover:scale-110 group-hover:rotate-3 origin-center"
+                            className={`backdrop-blur-sm p-3 rounded-full border hover:shadow-lg transition-all duration-500 cursor-pointer group-hover:scale-110 group-hover:rotate-3 origin-center ${
+                              isProcessing 
+                                ? 'bg-gradient-to-br from-yellow-100/80 to-orange-100/80 border-yellow-300/50 animate-pulse' 
+                                : 'bg-gradient-to-br from-white/80 to-slate-50/80 border-slate-200/50'
+                            }`}
                             style={{
                               animationDelay: `${index * 0.1}s`,
-                              animation: 'fadeInUp 0.6s ease-out forwards'
+                              animation: isProcessing ? 'fadeInUp 0.6s ease-out forwards, pulse 2s infinite' : 'fadeInUp 0.6s ease-out forwards'
                             }}
                           >
-                            <div className="text-xl text-center">{symbol}</div>
+                            <div className={`text-xl text-center ${isProcessing ? 'animate-spin' : ''}`}>{symbol}</div>
                           </div>
-                          <div className="absolute bottom-full mb-3 left-1/2 transform -translate-x-1/2 bg-slate-800/90 backdrop-blur-sm text-white px-3 py-2 rounded-lg text-xs opacity-0 group-hover:opacity-100 transition-all duration-300 whitespace-nowrap z-50 max-w-xs shadow-lg pointer-events-none">
-                            <div className="font-medium text-slate-100">{pulse.gen_title || pulse.intent}</div>
+                          <div className={`absolute bottom-full mb-3 left-1/2 transform -translate-x-1/2 backdrop-blur-sm text-white px-3 py-2 rounded-lg text-xs opacity-0 group-hover:opacity-100 transition-all duration-300 whitespace-nowrap z-50 max-w-xs shadow-lg pointer-events-none ${
+                            isProcessing ? 'bg-yellow-800/90' : 'bg-slate-800/90'
+                          }`}>
+                            <div className="font-medium text-slate-100">
+                              {isProcessing ? '⚡ ' : ''}{pulse.gen_title || pulse.intent}
+                            </div>
                             {pulse.reflection && (
                               <div className="text-slate-300 mt-1 whitespace-normal italic max-w-48">"{pulse.reflection}"</div>
                             )}
-                            <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-slate-800/90"></div>
+                            {isProcessing && (
+                              <div className="text-yellow-300 mt-1 text-xs animate-pulse">Processing your sacred rune...</div>
+                            )}
+                            <div className={`absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent ${
+                              isProcessing ? 'border-t-yellow-800/90' : 'border-t-slate-800/90'
+                            }`}></div>
                           </div>
                         </div>
                       </div>
@@ -526,6 +541,11 @@ export const PulseApp: React.FC<PulseAppProps> = ({ config, onReconfigure }) => 
               <p className="text-sm text-gray-600">
                 You have manifested {displayPulses.length + (activePulse ? 1 : 0)} sacred rune{displayPulses.length + (activePulse ? 1 : 0) !== 1 ? 's' : ''}
                 {activePulse && ' (1 in progress)'}
+                {curatedStoppedPulses.length > 0 && (
+                  <span className="text-yellow-600 font-medium">
+                    {' '}• {curatedStoppedPulses.length} processing ⚡
+                  </span>
+                )}
               </p>
             </div>
           )}
