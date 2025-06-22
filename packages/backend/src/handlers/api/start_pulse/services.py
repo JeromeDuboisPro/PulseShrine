@@ -33,8 +33,15 @@ def start_pulse(
         # Generate unique pulse ID
         pulse_data.pulse_id = pulse_data.pulse_id or str(uuid.uuid4())
 
-        # Convert datetime to ISO format string for DynamoDB
-        start_time_iso = pulse_data.start_time_dt.isoformat()
+        # Convert datetime to UTC ISO format string for DynamoDB
+        if pulse_data.start_time_dt.tzinfo is None:
+            # If naive datetime, assume it's UTC
+            start_time_utc = pulse_data.start_time_dt.replace(tzinfo=datetime.timezone.utc)
+        else:
+            # Convert to UTC if timezone-aware
+            start_time_utc = pulse_data.start_time_dt.astimezone(datetime.timezone.utc)
+        
+        start_time_iso = start_time_utc.isoformat()
         created_at = datetime.datetime.now(datetime.timezone.utc).isoformat()
 
         # Prepare the item to insert
@@ -56,14 +63,14 @@ def start_pulse(
         if pulse_data.tags:
             item["tags"] = pulse_data.tags
 
-        # Calculate end_time if duration is provided
+        # Calculate end_time if duration is provided (always in UTC)
         if pulse_data.duration_seconds is not None:
             from datetime import timedelta
 
-            end_time = pulse_data.start_time_dt + timedelta(
+            end_time_utc = start_time_utc + timedelta(
                 seconds=pulse_data.duration_seconds
             )
-            item["end_time"] = end_time.isoformat()
+            item["end_time"] = end_time_utc.isoformat()
 
         # Put item into DynamoDB
         get_ddb_table(table_name).put_item(

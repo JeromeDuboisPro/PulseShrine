@@ -32,7 +32,7 @@ app = APIGatewayRestResolver(cors=cors_config)
 
 
 @app.post("/start-pulse")
-def start_pulse_handler():
+def start_pulse_handler() -> dict[str, Any]:
     """
     Handler function to start a pulse.
     """
@@ -58,7 +58,13 @@ def start_pulse_handler():
     if not result:
         logger.error("Failed to start pulse due to invalid input data.")
         raise BadRequestError("Failed to start pulse. Please check the input data.")
-    return result.model_dump(mode="json")
+
+    # Custom serialization to preserve timezone info
+    data = result.model_dump(mode="json")
+    # Ensure start_time includes timezone info
+    if hasattr(result, "start_time_dt") and result.start_time_dt:
+        data["start_time"] = result.start_time_dt.isoformat()
+    return data
 
 
 def handler(event: dict[str, Any], context: LambdaContext) -> dict[str, Any]:

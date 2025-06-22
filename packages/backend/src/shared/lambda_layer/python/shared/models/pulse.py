@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from functools import cached_property
 from pydantic import BaseModel, Field, computed_field
 from typing import List, Optional
@@ -15,8 +15,8 @@ class PulseBase(BaseModel):
     intent: str
     pulse_id: Optional[str] = Field(default=None)
     start_time: Optional[datetime | str] = Field(
-        default_factory=datetime.now,
-        description="Start time of the pulse, defaults to now if not provided",
+        default_factory=lambda: datetime.now(timezone.utc),
+        description="Start time of the pulse, defaults to UTC now if not provided",
     )
     duration_seconds: Optional[int] = Field(default=None)
     tags: Optional[List[str]] = Field(default=None)
@@ -24,12 +24,19 @@ class PulseBase(BaseModel):
 
     @cached_property
     def start_time_dt(self) -> datetime:
-        """Return the start time in ISO format."""
+        """Return the start time as timezone-aware datetime."""
         if isinstance(self.start_time, datetime):
+            # Ensure timezone-aware
+            if self.start_time.tzinfo is None:
+                return self.start_time.replace(tzinfo=timezone.utc)
             return self.start_time
         elif isinstance(self.start_time, str):
             try:
-                return datetime.fromisoformat(self.start_time)
+                dt = datetime.fromisoformat(self.start_time)
+                # Ensure timezone-aware
+                if dt.tzinfo is None:
+                    return dt.replace(tzinfo=timezone.utc)
+                return dt
             except ValueError as exc:
                 raise PulseCreationError(f"Invalid start_time format: {exc}") from exc
         else:
@@ -63,8 +70,8 @@ class StartPulse(PulseBase):
 class StopPulse(PulseBase):
     reflection: str
     stopped_at: Optional[datetime | str] = Field(
-        default_factory=datetime.now,
-        description="Start time of the pulse, defaults to now if not provided",
+        default_factory=lambda: datetime.now(timezone.utc),
+        description="Stop time of the pulse, defaults to UTC now if not provided",
     )
 
     @cached_property
@@ -91,8 +98,8 @@ class StopPulse(PulseBase):
 
 class ArchivedPulse(StopPulse):
     archived_at: Optional[datetime | str] = Field(
-        default_factory=datetime.now,
-        description="Start time of the pulse, defaults to now if not provided",
+        default_factory=lambda: datetime.now(timezone.utc),
+        description="Archive time of the pulse, defaults to UTC now if not provided",
     )
     gen_title: str = Field(
         default="",

@@ -28,7 +28,7 @@ app = APIGatewayRestResolver(cors=cors_config)
 
 
 @app.get("/get-start-pulse")
-def get_start_pulse_handler() -> StartPulse | None:
+def get_start_pulse_handler() -> dict[str, Any] | None:
     """
     Handler function to get the start pulse of a user.
     """
@@ -40,7 +40,14 @@ def get_start_pulse_handler() -> StartPulse | None:
     logger.warning(f"Retrieving current StartPulse for user {user_id}")
     try:
         result = get_start_pulse(user_id=user_id, table_name=START_PULSE_TABLE_NAME)
-        return result
+        if result:
+            # Custom serialization to preserve timezone info
+            data = result.model_dump(mode="json")
+            # Ensure start_time includes timezone info
+            if hasattr(result, "start_time_dt") and result.start_time_dt:
+                data["start_time"] = result.start_time_dt.isoformat()
+            return data
+        return None
 
     except Exception as exc:
         logger.error(f"Unexpected error: {str(exc)}")
