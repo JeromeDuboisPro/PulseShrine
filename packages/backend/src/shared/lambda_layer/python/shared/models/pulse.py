@@ -18,7 +18,11 @@ class PulseBase(BaseModel):
         default_factory=lambda: datetime.now(timezone.utc),
         description="Start time of the pulse, defaults to UTC now if not provided",
     )
-    duration_seconds: Optional[int] = Field(default=None)
+    duration_seconds: Optional[int] = Field(
+        default=None,
+        ge=0,
+        description="Duration in seconds; must be a positive integer if provided",
+    )
     intent_emotion: Optional[str] = Field(
         default=None, description="Energy type for the pulse (creation, focus, etc.)"
     )
@@ -89,6 +93,16 @@ class StopPulse(PulseBase):
             return datetime.fromisoformat(self.stopped_at)
         else:
             raise PulseCreationError("stopped_at field cannot be None for StopPulse.")
+
+    @cached_property
+    def actual_duration_seconds(self) -> int:
+        actual_duration = int((self.stopped_at_dt - self.start_time_dt).total_seconds())
+        duration = (
+            actual_duration
+            if self.duration_seconds is None
+            else min(actual_duration, self.duration_seconds)
+        )
+        return duration
 
     def model_post_init(self, _):
         if self.duration_seconds is None and self.start_time and self.stopped_at_dt:
