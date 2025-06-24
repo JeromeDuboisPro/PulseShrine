@@ -1,9 +1,7 @@
-import * as pipes from '@aws-cdk/aws-pipes-alpha';
-import * as sources from '@aws-cdk/aws-pipes-sources-alpha';
-import * as targets from '@aws-cdk/aws-pipes-targets-alpha';
 import * as cdk from 'aws-cdk-lib';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import * as sqs from 'aws-cdk-lib/aws-sqs';
+import * as ssm from 'aws-cdk-lib/aws-ssm';
 import { Construct } from 'constructs';
 
 
@@ -75,30 +73,49 @@ export class InfrastructureStack extends cdk.Stack {
       retentionPeriod: cdk.Duration.days(14),
     });
 
-    // Create the DynamoDB source
-    const pipeSourceV0 = new sources.DynamoDBSource(stopPulseTable, {
-      startingPosition: sources.DynamoDBStartingPosition.LATEST,
-      batchSize: 1,
-      deadLetterTarget: pulsesIngestionDDBDLQ,
-      maximumRetryAttempts: 1,
-    });
+    // =====================================================
+    // Parameter Store setup for AI configuration
+    // =====================================================
+    const aiParameters = {
+      targetPercentage: new ssm.StringParameter(this, 'AITargetPercentage', {
+        parameterName: '/pulseshrine/ai/target_percentage',
+        stringValue: '0.10',
+        description: 'Target percentage of pulses to enhance with AI',
+      }),
+      durationWeight: new ssm.StringParameter(this, 'AIDurationWeight', {
+        parameterName: '/pulseshrine/ai/duration_weight',
+        stringValue: '0.4',
+        description: 'Weight for session duration in AI selection',
+      }),
+      reflectionWeight: new ssm.StringParameter(this, 'AIReflectionWeight', {
+        parameterName: '/pulseshrine/ai/reflection_weight', 
+        stringValue: '0.3',
+        description: 'Weight for reflection quality in AI selection',
+      }),
+      intentWeight: new ssm.StringParameter(this, 'AIIntentWeight', {
+        parameterName: '/pulseshrine/ai/intent_weight',
+        stringValue: '0.2', 
+        description: 'Weight for intent type in AI selection',
+      }),
+      maxCostCents: new ssm.StringParameter(this, 'AIMaxCostCents', {
+        parameterName: '/pulseshrine/ai/max_cost_per_pulse_cents',
+        stringValue: '2',
+        description: 'Maximum cost per pulse in cents',
+      }),
+      enabled: new ssm.StringParameter(this, 'AIEnabled', {
+        parameterName: '/pulseshrine/ai/enabled',
+        stringValue: 'true',
+        description: 'Enable/disable AI enhancement',
+      }),
+      bedrockModelId: new ssm.StringParameter(this, 'AIBedrockModelId', {
+        parameterName: '/pulseshrine/ai/bedrock_model_id',
+        stringValue: 'amazon.titan-text-express-v1', // Default - backend will use region-appropriate model
+        description: 'Bedrock model ID for AI enhancement (region-appropriate default)',
+      }),
+    };
 
-    // Create the SQS target
-    const pipeTarget = new targets.SqsTarget(pulsesIngestionQueue);
 
-    // Create the filter - correct syntax
-    const sourceFilter = new pipes.Filter([
-      pipes.FilterPattern.fromObject({
-        eventName: ['INSERT'] // Filter for INSERT events only
-      })
-    ]);
-
-    new pipes.Pipe(this, 'StopPulseToSqsPipeV1', {
-      pipeName: 'stop-pulse-to-sqs-pipe',
-      source: pipeSourceV0,
-      target: pipeTarget,
-      filter: sourceFilter, // Apply the filter
-    });
+    // Note: EventBridge Pipe moved to SfnStack to connect DynamoDB stream to Step Functions
 
     this.startPulseTable = startPulseTable;
     this.stopPulseTable = stopPulseTable;

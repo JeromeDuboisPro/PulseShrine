@@ -178,24 +178,122 @@ class IntentData(BaseModel):
         return None
 
     @staticmethod
-    def extract_intent_category(intent: str) -> str:
-        """Extract intent category from intent string."""
-        intent_lower = intent.lower()
+    def extract_intent_category(intent_text: str) -> str:
+        """Extract the most probable intent category from free-form user text."""
+        if not intent_text or not intent_text.strip():
+            return "default"
 
-        # Check for common patterns
+        intent_lower = intent_text.lower().strip()
+        categories = list(IntentData.intent_nouns_categories())
 
+        # Step 1: Try exact match with individual words
+        words = intent_lower.split()
+        for word in words:
+            if word in categories:
+                return word
+
+        # Step 2: Try fuzzy matching against individual words
+        for word in words:
+            category = IntentData.find_best_match_fuzzy(word, categories, threshold=60)
+            if category:
+                return category
+
+        # Step 3: Try fuzzy matching against the whole text
         category = IntentData.find_best_match_fuzzy(
-            intent_lower, list(IntentData.intent_nouns_categories())
+            intent_lower, categories, threshold=50
         )
         if category:
             return category
 
-        # Fallback to synonyms
-        return IntentData.get_synonym_for_noun(intent_lower)
+        # Step 4: Check for keyword patterns in each category's nouns
+        intent_nouns_dict = IntentData.intent_nouns()
+        for category_name, intent_noun in intent_nouns_dict.items():
+            # Check if any words in the intent match nouns for this category
+            for noun in intent_noun.nouns:
+                for word in words:
+                    noun_list = noun.split() if isinstance(noun, list) else [noun]
+                    if IntentData.find_best_match_fuzzy(word, noun_list, threshold=60):
+                        return category_name
+
+        # Step 5: Fallback to synonyms check
+        for word in words:
+            synonym_result = IntentData.get_synonym_for_noun(word)
+            if synonym_result and synonym_result != "default":
+                return synonym_result
+
+        # Step 6: Final fallback - try to extract common activity keywords
+        activity_keywords = {
+            "work": "work",
+            "study": "study",
+            "learn": "study",
+            "read": "study",
+            "create": "creation",
+            "write": "creation",
+            "code": "creation",
+            "program": "creation",
+            "design": "creation",
+            "think": "reflection",
+            "meditate": "reflection",
+            "plan": "planning",
+            "organize": "planning",
+            "exercise": "fitness",
+            "workout": "fitness",
+            "run": "fitness",
+            "relax": "relaxation",
+            "rest": "relaxation",
+        }
+
+        for word in words:
+            for keyword, category in activity_keywords.items():
+                if keyword in word or IntentData.find_best_match_fuzzy(
+                    word, [keyword], threshold=70
+                ):
+                    # Verify the category exists in our categories
+                    if category in categories:
+                        return category
+
+        return "default"
 
     @staticmethod
-    def get_emoji(intent_category: str) -> str:
-        """Get appropriate emoji for intent."""
+    def get_emoji(
+        intent_category: str, intent_emotion: str = "", reflection_emotion: str = ""
+    ) -> str:
+        """Get appropriate emoji for intent with emotion context."""
+        # Emotion-based emoji mapping
+        emotion_emojis = {
+            "focus": "🎯",
+            "focused": "🎯",
+            "creation": "💡",
+            "creative": "💡",
+            "study": "📚",
+            "learning": "📚",
+            "work": "💼",
+            "productive": "💼",
+            "brainstorm": "🧠",
+            "thinking": "🧠",
+            "reflection": "🤔",
+            "contemplative": "🤔",
+            "energized": "⚡",
+            "excited": "⚡",
+            "accomplished": "🏆",
+            "fulfilled": "🏆",
+            "peaceful": "🕯️",
+            "calm": "🕯️",
+            "grounded": "🌿",
+            "centered": "🌿",
+            "frustrated": "😤",
+            "tired": "😴",
+        }
+
+        # Prioritize reflection emotion for final state
+        if reflection_emotion and reflection_emotion.lower() in emotion_emojis:
+            return emotion_emojis[reflection_emotion.lower()]
+
+        # Fallback to intent emotion
+        if intent_emotion and intent_emotion.lower() in emotion_emojis:
+            return emotion_emojis[intent_emotion.lower()]
+
+        # Default to category-based emojis
         emojis = IntentData.intent_emojis().get(
             intent_category, IntentData.intent_emojis()["default"]
         )
@@ -275,8 +373,34 @@ class SentimentAdjectives(BaseModel):
             return "neutral", 0.0
 
     @staticmethod
-    def get_random_sentiment_adjective(text: str) -> str:
-        """Get random sentiment category for the given text."""
+    def get_random_sentiment_adjective(text: str, reflection_emotion: str = "") -> str:
+        """Get random sentiment category for the given text with emotion context."""
+        # If we have a reflection emotion, use it to bias sentiment selection
+        if reflection_emotion:
+            emotion_to_sentiment = {
+                "accomplished": "very_positive",
+                "fulfilled": "very_positive",
+                "energized": "positive",
+                "excited": "positive",
+                "peaceful": "neutral_positive",
+                "calm": "neutral_positive",
+                "focused": "neutral_positive",
+                "grounded": "neutral_positive",
+                "centered": "neutral_positive",
+                "contemplative": "neutral",
+                "tired": "neutral_negative",
+                "frustrated": "negative",
+            }
+
+            emotion_sentiment = emotion_to_sentiment.get(reflection_emotion.lower())
+            if emotion_sentiment:
+                sentiment_adjective = SentimentAdjectives.get_random_adjective(
+                    emotion_sentiment
+                )
+                if sentiment_adjective:
+                    return sentiment_adjective.capitalize()
+
+        # Fallback to text analysis
         sentiment_category, _ = SentimentAdjectives.analyze_sentiment(text)
         sentiment_adjective = SentimentAdjectives.get_random_adjective(
             sentiment_category
