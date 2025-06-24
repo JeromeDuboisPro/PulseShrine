@@ -86,11 +86,18 @@ class StopPulse(PulseBase):
 
     @cached_property
     def stopped_at_dt(self) -> datetime:
-        """Return the stopped_at time in ISO format."""
+        """Return the stopped_at time as timezone-aware datetime object."""
         if isinstance(self.stopped_at, datetime):
+            # Ensure timezone-aware
+            if self.stopped_at.tzinfo is None:
+                return self.stopped_at.replace(tzinfo=timezone.utc)
             return self.stopped_at
         elif self.stopped_at:
-            return datetime.fromisoformat(self.stopped_at)
+            dt = datetime.fromisoformat(self.stopped_at)
+            # Ensure timezone-aware
+            if dt.tzinfo is None:
+                return dt.replace(tzinfo=timezone.utc)
+            return dt
         else:
             raise PulseCreationError("stopped_at field cannot be None for StopPulse.")
 
@@ -136,18 +143,25 @@ class ArchivedPulse(StopPulse):
         """Return the stopped time 'reversed to optimize most recent search in ddb."""
         return int(
             (
-                datetime(year=9999, month=12, day=31, hour=23, minute=59, second=59)
+                datetime(year=9999, month=12, day=31, hour=23, minute=59, second=59, tzinfo=timezone.utc)
                 - self.stopped_at_dt
             ).total_seconds()
         )
 
     def archived_at_dt(self) -> datetime:
-        """Return the archived_at time in ISO format."""
+        """Return the archived_at time as timezone-aware datetime object."""
         if isinstance(self.archived_at, datetime):
+            # Ensure timezone-aware
+            if self.archived_at.tzinfo is None:
+                return self.archived_at.replace(tzinfo=timezone.utc)
             return self.archived_at
         elif isinstance(self.archived_at, str):
             try:
-                return datetime.fromisoformat(self.archived_at)
+                dt = datetime.fromisoformat(self.archived_at)
+                # Ensure timezone-aware
+                if dt.tzinfo is None:
+                    return dt.replace(tzinfo=timezone.utc)
+                return dt
             except ValueError as exc:
                 raise PulseCreationError(f"Invalid archived_at format: {exc}") from exc
         else:
