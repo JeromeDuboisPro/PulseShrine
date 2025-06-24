@@ -350,7 +350,7 @@ export const PulseApp: React.FC<PulseAppProps> = ({ config, onReconfigure }) => 
             Welcome to your sacred shrine, seeker. Here, your completed pulses transform into powerful runes that enhance the tranquility of this space. Each intention you fulfill adds to the mystical energy surrounding us.
           </GuardianMessage>
 
-          <div className="relative bg-gradient-to-br from-slate-100 via-green-50 to-blue-50 rounded-xl p-8 mb-8 border border-slate-200 overflow-hidden">
+          <div className="relative bg-gradient-to-br from-slate-100 via-green-50 to-blue-50 rounded-xl p-8 mb-8 border border-slate-200">
             {/* Zen Garden Background */}
             <div className="absolute inset-0 opacity-20">
               <svg className="w-full h-full" viewBox="0 0 800 400" fill="none">
