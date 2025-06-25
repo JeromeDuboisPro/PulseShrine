@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Settings, ExternalLink, CheckCircle, Sparkles } from 'lucide-react';
 import { ApiConfig } from '../config';
+import { PulseShrineLogoSvg } from './PulseShrineLogoSvg';
 
 interface SetupScreenProps {
   onConfigured: (config: ApiConfig) => void;
@@ -47,7 +48,7 @@ export const SetupScreen: React.FC<SetupScreenProps> = ({ onConfigured }) => {
         {/* Header */}
         <div className="p-8 border-b border-gray-200 text-center">
           <div className="flex items-center justify-center space-x-3 mb-4">
-            <Sparkles className="w-8 h-8 text-purple-600" />
+            <PulseShrineLogoSvg size={64} className="drop-shadow-lg transition-transform duration-300 hover:scale-110" />
             <h1 className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
               PulseShrine
             </h1>

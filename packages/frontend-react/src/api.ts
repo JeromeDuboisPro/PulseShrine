@@ -26,6 +26,21 @@ export interface StopPulse {
   intent_emotion?: string;
   gen_title?: string;
   gen_badge?: string;
+  // AI Enhancement Data (may be present during processing)
+  ai_enhanced?: boolean;
+  ai_cost_cents?: number;
+  triggered_rewards?: Array<{
+    type: string;
+    ai_credits: number;
+    message: string;
+    achievement?: string;
+  }>;
+  selection_info?: {
+    decision_reason: string;
+    worthiness_score: number;
+    estimated_cost_cents: number;
+    could_be_enhanced?: boolean;
+  };
 }
 
 export interface IngestedPulse {
@@ -41,6 +56,29 @@ export interface IngestedPulse {
   gen_title: string;
   gen_badge: string;
   gen_rune_name?: string;
+  // AI Enhancement Data
+  ai_enhanced?: boolean;
+  ai_cost_cents?: number;
+  ai_insights?: {
+    productivity_score: number;
+    key_insight: string;
+    next_suggestion: string;
+    mood_assessment: string;
+    emotion_pattern?: string;
+  };
+  triggered_rewards?: Array<{
+    type: string;
+    ai_credits: number;
+    message: string;
+    achievement?: string;
+  }>;
+  // Selection metadata (for plan limitation awareness)
+  selection_info?: {
+    decision_reason: string;
+    worthiness_score: number;
+    estimated_cost_cents: number;
+    could_be_enhanced?: boolean;
+  };
 }
 
 // API Error handling

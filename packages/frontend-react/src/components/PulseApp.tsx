@@ -1,8 +1,9 @@
-import { Heart, Moon, Mountain, Pause, Play, RotateCcw, Sparkles, Target, Zap, Settings } from 'lucide-react';
+import { Heart, Moon, Mountain, Pause, Play, RotateCcw, Sparkles, Target, Zap, Settings, Star, Brain, Award, CreditCard, AlertCircle } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { ApiError, IngestedPulse, PulseAPI, StartPulse, StopPulse } from '../api';
 import { ApiConfig, updateConfig } from '../config';
 import { ConfigurationModal } from './ConfigurationModal';
+import { PulseShrineLogoSvg } from './PulseShrineLogoSvg';
 
 interface PulseAppProps {
   config: ApiConfig;
@@ -22,9 +23,28 @@ export const PulseApp: React.FC<PulseAppProps> = ({ config, onReconfigure }) => 
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [showConfigModal, setShowConfigModal] = useState(false);
+  const [planNotification, setPlanNotification] = useState<{
+    message: string;
+    type: 'upgrade' | 'budget' | 'achievement';
+    pulse?: IngestedPulse | StopPulse;
+  } | null>(null);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const userIdRef = useRef(config.userId);
   const loadPulsesRef = useRef<(() => Promise<void>) | null>(null);
+
+  // Helper to detect connection/API issues
+  const isConnectionError = (errorMessage: string | null): boolean => {
+    if (!errorMessage) return false;
+    const msg = errorMessage.toLowerCase();
+    return msg.includes('network') || 
+           msg.includes('connection') || 
+           msg.includes('fetch') || 
+           msg.includes('failed to fetch') || 
+           msg.includes('api') ||
+           msg.includes('timeout') ||
+           msg.includes('refused') ||
+           msg.includes('unavailable');
+  };
 
   // Calculate remaining time for an active pulse
   const calculateRemainingTime = (pulse: StartPulse): number => {
@@ -76,7 +96,7 @@ export const PulseApp: React.FC<PulseAppProps> = ({ config, onReconfigure }) => 
 
   // Energy icons mapping
   const energyIcons = {
-    creation: { icon: Sparkles, color: 'text-purple-500', bg: 'bg-purple-100' },
+    creation: { icon: () => <PulseShrineLogoSvg size={48} className="text-purple-500" />, color: 'text-purple-500', bg: 'bg-purple-100' },
     focus: { icon: Target, color: 'text-blue-500', bg: 'bg-blue-100' },
     brainstorm: { icon: Zap, color: 'text-yellow-500', bg: 'bg-yellow-100' },
     study: { icon: Heart, color: 'text-green-500', bg: 'bg-green-100' },
@@ -107,6 +127,35 @@ export const PulseApp: React.FC<PulseAppProps> = ({ config, onReconfigure }) => 
         setActivePulse(started);
         setCompletedPulses(ingested.sort((a, b) => b.inverted_timestamp - a.inverted_timestamp));
         setStoppedPulses(stopped);
+        
+        // Check for plan limitation notifications
+        const recentPulses = [...ingested, ...stopped].filter(p => {
+          const pulseTime = p.timestamp * 1000;
+          const now = Date.now();
+          return (now - pulseTime) < 300000; // Last 5 minutes
+        });
+        
+        recentPulses.forEach(pulse => {
+          if (pulse.selection_info?.could_be_enhanced && !pulse.ai_enhanced) {
+            setPlanNotification({
+              message: `This ${pulse.selection_info.worthiness_score >= 0.8 ? 'exceptional' : 'high-quality'} pulse could have been AI-enhanced!`,
+              type: 'upgrade',
+              pulse
+            });
+            // Auto-dismiss after 10 seconds for upgrade notifications
+            setTimeout(() => setPlanNotification(null), 10000);
+          }
+          
+          if (pulse.triggered_rewards && pulse.triggered_rewards.length > 0) {
+            setPlanNotification({
+              message: pulse.triggered_rewards[0].message,
+              type: 'achievement',
+              pulse
+            });
+            // Auto-dismiss after 7 seconds for achievement notifications
+            setTimeout(() => setPlanNotification(null), 7000);
+          }
+        });
         
         // If there's an active pulse, calculate remaining time and set duration
         if (started && started.duration_seconds) {
@@ -254,6 +303,15 @@ export const PulseApp: React.FC<PulseAppProps> = ({ config, onReconfigure }) => 
       setDuration(25);
       setCurrentView('shrine');
       
+      // Show completion notification
+      setPlanNotification({
+        message: 'Sacred rune created! Your pulse is now processing...',
+        type: 'achievement'
+      });
+      
+      // Auto-dismiss notification after 5 seconds
+      setTimeout(() => setPlanNotification(null), 5000);
+      
       // Refresh pulses to show the completed pulse
       if (loadPulsesRef.current) {
         await loadPulsesRef.current();
@@ -301,6 +359,67 @@ export const PulseApp: React.FC<PulseAppProps> = ({ config, onReconfigure }) => 
     </div>
   );
 
+  const PlanNotification = ({ notification, onClose }: {
+    notification: { message: string; type: 'upgrade' | 'budget' | 'achievement'; pulse?: IngestedPulse | StopPulse };
+    onClose: () => void;
+  }) => {
+    const getNotificationStyle = () => {
+      switch (notification.type) {
+        case 'achievement':
+          return 'from-yellow-50 to-orange-50 border-yellow-200 text-yellow-800';
+        case 'upgrade':
+          return 'from-purple-50 to-blue-50 border-purple-200 text-purple-800';
+        case 'budget':
+          return 'from-blue-50 to-indigo-50 border-blue-200 text-blue-800';
+        default:
+          return 'from-gray-50 to-slate-50 border-gray-200 text-gray-800';
+      }
+    };
+
+    const getIcon = () => {
+      switch (notification.type) {
+        case 'achievement':
+          return <Award className="w-5 h-5 text-yellow-600" />;
+        case 'upgrade':
+          return <Star className="w-5 h-5 text-purple-600" />;
+        case 'budget':
+          return <CreditCard className="w-5 h-5 text-blue-600" />;
+        default:
+          return <AlertCircle className="w-5 h-5 text-gray-600" />;
+      }
+    };
+
+    return (
+      <div className={`bg-gradient-to-r ${getNotificationStyle()} rounded-lg p-4 mb-4 border backdrop-blur-sm transition-all duration-300`}>
+        <div className="flex items-start justify-between">
+          <div className="flex items-start space-x-3">
+            {getIcon()}
+            <div className="flex-1">
+              <p className="font-medium">{notification.message}</p>
+              {notification.type === 'upgrade' && notification.pulse && (
+                <div className="mt-2 text-sm opacity-80">
+                  <p>Worthiness: {Math.round((notification.pulse.selection_info?.worthiness_score ?? 0) * 100)}%</p>
+                  <p className="text-xs mt-1">Upgrade to enhance high-quality pulses with AI insights!</p>
+                </div>
+              )}
+              {notification.type === 'achievement' && notification.pulse?.triggered_rewards && (
+                <div className="mt-2 text-sm opacity-80">
+                  <p>+{notification.pulse.triggered_rewards[0]?.ai_credits} AI Credits earned! 🎉</p>
+                </div>
+              )}
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="text-current opacity-60 hover:opacity-100 transition-opacity ml-4"
+          >
+            ×
+          </button>
+        </div>
+      </div>
+    );
+  };
+
   const renderShrine = () => {
     // Combine all pulses for display
     const ingestedIdsSet = new Set(completedPulses.map(p => p.pulse_id));
@@ -327,9 +446,12 @@ export const PulseApp: React.FC<PulseAppProps> = ({ config, onReconfigure }) => 
           <header className="text-center mb-8">
             <div className="flex items-center justify-between mb-4">
               <div className="flex-1"></div>
-              <h1 className="text-4xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
-                Pulse Shrine
-              </h1>
+              <div className="flex items-center space-x-3">
+                <PulseShrineLogoSvg size={72} className="drop-shadow-lg transition-transform duration-300 hover:scale-110 cursor-pointer" />
+                <h1 className="text-4xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
+                  Pulse Shrine
+                </h1>
+              </div>
               <div className="flex-1 flex justify-end">
                 <button
                   onClick={() => setShowConfigModal(true)}
@@ -341,10 +463,40 @@ export const PulseApp: React.FC<PulseAppProps> = ({ config, onReconfigure }) => 
               </div>
             </div>
             <p className="text-gray-600">Sacred space of mindful productivity</p>
-            <p className="text-xs text-gray-500 mt-1">Connected to: {config.apiBaseUrl}</p>
+            {/* Connection Status - Only show when there's an issue */}
+            {isConnectionError(error) ? (
+              <div className="flex items-center justify-center space-x-2 mt-3">
+                <div className="flex space-x-1">
+                  <div className="w-2 h-2 bg-red-400 rounded-full animate-pulse" style={{animationDelay: '0s'}}></div>
+                  <div className="w-2 h-2 bg-red-400 rounded-full animate-pulse" style={{animationDelay: '0.3s'}}></div>
+                  <div className="w-2 h-2 bg-red-400 rounded-full animate-pulse" style={{animationDelay: '0.6s'}}></div>
+                </div>
+                <span className="text-xs text-red-600 font-medium bg-red-50 px-3 py-1 rounded-full border border-red-200">
+                  ⚠️ Sacred Network disrupted • Restoring harmony...
+                </span>
+                <div className="flex space-x-1">
+                  <div className="w-2 h-2 bg-red-400 rounded-full animate-pulse" style={{animationDelay: '0.9s'}}></div>
+                  <div className="w-2 h-2 bg-red-400 rounded-full animate-pulse" style={{animationDelay: '1.2s'}}></div>
+                  <div className="w-2 h-2 bg-red-400 rounded-full animate-pulse" style={{animationDelay: '1.5s'}}></div>
+                </div>
+              </div>
+            ) : null}
+            
+            {/* Wisdom message - always show when no connection issues */}
+            <div className="text-xs text-gray-500 mt-3 flex items-center justify-center space-x-1 italic">
+              <span className="animate-pulse">🕊️</span>
+              <span>The digital realm resonates with ancient wisdom</span>
+              <span className="animate-pulse">🕊️</span>
+            </div>
           </header>
 
           {error && <ErrorMessage message={error} onClose={() => setError(null)} />}
+          {planNotification && (
+            <PlanNotification 
+              notification={planNotification} 
+              onClose={() => setPlanNotification(null)} 
+            />
+          )}
 
           <GuardianMessage>
             Welcome to your sacred shrine, seeker. Here, your completed pulses transform into powerful runes that enhance the tranquility of this space. Each intention you fulfill adds to the mystical energy surrounding us.
@@ -402,19 +554,19 @@ export const PulseApp: React.FC<PulseAppProps> = ({ config, onReconfigure }) => 
                 <div className="mt-4 text-xs text-slate-400">Each completed pulse becomes a mindful rune in this peaceful space</div>
               </div>
             ) : (
-              <div className="relative">
-                <div className="grid grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3 mb-6">
+              <div className="relative z-20">
+                <div className="grid grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3 mb-6 relative z-30">
                   {/* Show active pulse first if exists */}
                   {activePulse && (
                     <div className="group flex items-center justify-center">
                       <div className="relative">
-                        <div className="bg-gradient-to-br from-yellow-100/80 to-orange-50/80 backdrop-blur-sm p-3 rounded-full border border-yellow-200/50 hover:shadow-lg transition-all duration-500 cursor-pointer animate-pulse-slow group-hover:scale-110 group-hover:rotate-3 origin-center">
+                        <div className="bg-gradient-to-br from-yellow-100/80 to-orange-50/80 backdrop-blur-sm p-3 rounded-full border border-yellow-200/50 hover:shadow-lg transition-all duration-500 cursor-pointer animate-pulse group-hover:scale-110 group-hover:rotate-3 origin-center">
                           <div className="text-xl text-center">⏳</div>
                           <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-gradient-to-br from-yellow-200 to-orange-300 flex items-center justify-center">
                             <Target className="w-2 h-2 text-orange-600" />
                           </div>
                         </div>
-                        <div className="absolute bottom-full mb-3 left-1/2 transform -translate-x-1/2 bg-slate-800/90 backdrop-blur-sm text-white px-3 py-2 rounded-lg text-xs opacity-0 group-hover:opacity-100 transition-all duration-300 whitespace-nowrap z-50 max-w-xs shadow-lg pointer-events-none">
+                        <div className="absolute bottom-full mb-3 left-1/2 transform -translate-x-1/2 bg-slate-800/90 backdrop-blur-sm text-white px-3 py-2 rounded-lg text-xs opacity-0 group-hover:opacity-100 transition-all duration-300 z-50 max-w-sm shadow-lg pointer-events-none">
                           <div className="font-medium text-slate-100">{activePulse.intent}</div>
                           <div className="text-slate-300 mt-1">Active pulse in progress...</div>
                           <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-slate-800/90"></div>
@@ -427,36 +579,49 @@ export const PulseApp: React.FC<PulseAppProps> = ({ config, onReconfigure }) => 
                   {displayPulses.map((pulse, index) => {
                     const symbol = pulse.gen_badge?.trim().split(' ')[0] || '✨';
                     const isProcessing = (pulse as any).processing;
+                    const isAiEnhanced = pulse.ai_enhanced && !isProcessing;
                     return (
                       <div key={pulse.pulse_id} className="group flex items-center justify-center">
                         <div className="relative">
                           <div 
-                            className={`backdrop-blur-sm p-3 rounded-full border hover:shadow-lg transition-all duration-500 cursor-pointer group-hover:scale-110 group-hover:rotate-3 origin-center ${
+                            className={`backdrop-blur-sm p-3 rounded-full border transition-all duration-500 cursor-pointer group-hover:scale-110 group-hover:rotate-3 origin-center ${
                               isProcessing 
-                                ? 'bg-gradient-to-br from-yellow-100/80 to-orange-100/80 border-yellow-300/50 animate-pulse' 
-                                : 'bg-gradient-to-br from-white/80 to-slate-50/80 border-slate-200/50'
+                                ? 'bg-gradient-to-br from-yellow-100/80 to-orange-100/80 border-yellow-300/50 animate-pulse hover:shadow-lg' 
+                                : isAiEnhanced
+                                ? 'bg-gradient-to-br from-purple-100/90 to-blue-100/90 border-purple-300/70 shadow-lg shadow-purple-200/30 hover:shadow-xl hover:shadow-purple-300/40 animate-pulse-gentle'
+                                : 'bg-gradient-to-br from-white/80 to-slate-50/80 border-slate-200/50 hover:shadow-lg'
                             }`}
                             style={{
                               animationDelay: `${index * 0.1}s`,
-                              animation: isProcessing ? 'fadeInUp 0.6s ease-out forwards, pulse 2s infinite' : 'fadeInUp 0.6s ease-out forwards'
+                              animation: isProcessing ? 'pulse 2s infinite' : isAiEnhanced ? 'pulse-gentle 4s infinite' : 'none'
                             }}
                           >
                             <div className={`text-xl text-center ${isProcessing ? 'animate-spin' : ''}`}>{symbol}</div>
+                            {isAiEnhanced && (
+                              <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-gradient-to-br from-purple-400 to-blue-500 flex items-center justify-center animate-pulse">
+                                <Brain className="w-2 h-2 text-white" />
+                              </div>
+                            )}
                           </div>
-                          <div className={`absolute bottom-full mb-3 left-1/2 transform -translate-x-1/2 backdrop-blur-sm text-white px-3 py-2 rounded-lg text-xs opacity-0 group-hover:opacity-100 transition-all duration-300 whitespace-nowrap z-50 max-w-xs shadow-lg pointer-events-none ${
-                            isProcessing ? 'bg-yellow-800/90' : 'bg-slate-800/90'
+                          <div className={`absolute bottom-full mb-3 left-1/2 transform -translate-x-1/2 backdrop-blur-sm text-white px-3 py-2 rounded-lg text-xs opacity-0 group-hover:opacity-100 transition-all duration-300 z-50 max-w-sm shadow-lg pointer-events-none ${
+                            isProcessing ? 'bg-yellow-800/90' : isAiEnhanced ? 'bg-purple-800/90' : 'bg-slate-800/90'
                           }`}>
                             <div className="font-medium text-slate-100">
-                              {isProcessing ? '⚡ ' : ''}{pulse.gen_title || pulse.intent}
+                              {isProcessing ? '⚡ ' : isAiEnhanced ? '🧠 ' : ''}{pulse.gen_title || pulse.intent}
                             </div>
                             {pulse.reflection && (
-                              <div className="text-slate-300 mt-1 whitespace-normal italic max-w-48">"{pulse.reflection}"</div>
+                              <div className="text-slate-300 mt-1 italic">"{pulse.reflection}"</div>
                             )}
                             {isProcessing && (
                               <div className="text-yellow-300 mt-1 text-xs animate-pulse">Processing your sacred rune...</div>
                             )}
+                            {isAiEnhanced && pulse.ai_insights?.productivity_score && (
+                              <div className="text-purple-300 mt-1 text-xs">
+                                🌟 Realization: {pulse.ai_insights.productivity_score}/10
+                              </div>
+                            )}
                             <div className={`absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent ${
-                              isProcessing ? 'border-t-yellow-800/90' : 'border-t-slate-800/90'
+                              isProcessing ? 'border-t-yellow-800/90' : isAiEnhanced ? 'border-t-purple-800/90' : 'border-t-slate-800/90'
                             }`}></div>
                           </div>
                         </div>
@@ -466,10 +631,10 @@ export const PulseApp: React.FC<PulseAppProps> = ({ config, onReconfigure }) => 
                 </div>
                 
                 {/* Koi fish swimming animation */}
-                <div className="absolute bottom-4 right-8 opacity-30">
+                <div className="absolute bottom-4 right-8 opacity-30 z-10">
                   <div className="text-2xl animate-pulse" style={{animationDuration: '3s'}}>🐟</div>
                 </div>
-                <div className="absolute bottom-8 right-16 opacity-20">
+                <div className="absolute bottom-8 right-16 opacity-20 z-10">
                   <div className="text-xl animate-pulse" style={{animationDuration: '4s', animationDelay: '1s'}}>🐠</div>
                 </div>
               </div>
@@ -537,19 +702,94 @@ export const PulseApp: React.FC<PulseAppProps> = ({ config, onReconfigure }) => 
           </div>
 
           {(displayPulses.length > 0 || activePulse) && (
-            <div className="mt-6 text-center">
-              <p className="text-sm text-gray-600">
-                You have manifested {displayPulses.length + (activePulse ? 1 : 0)} sacred rune{displayPulses.length + (activePulse ? 1 : 0) !== 1 ? 's' : ''}
-                {activePulse && ' (1 in progress)'}
-                {curatedStoppedPulses.length > 0 && (
-                  <span className="text-yellow-600 font-medium">
-                    {' '}• {curatedStoppedPulses.length} processing ⚡
-                  </span>
+            <div className="mt-6">
+              {/* Enhanced Statistics */}
+              <div className="bg-white/50 backdrop-blur-sm rounded-lg p-4 mb-4 border border-white/60">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center max-w-md mx-auto">
+                  {/* Total Runes */}
+                  <div className="space-y-1">
+                    <div className="text-2xl font-bold text-gray-700">
+                      {displayPulses.length + (activePulse ? 1 : 0)}
+                    </div>
+                    <div className="text-xs text-gray-600">Sacred Runes</div>
+                  </div>
+                  
+                  {/* AI Enhanced */}
+                  <div className="space-y-1">
+                    <div className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent flex items-center justify-center space-x-1 animate-pulse">
+                      <Brain className="w-5 h-5 text-purple-600 animate-pulse" />
+                      <span>{displayPulses.filter(p => p.ai_enhanced).length}</span>
+                    </div>
+                    <div className="text-xs text-gray-600">🧠 AI Insights</div>
+                  </div>
+                  
+                  {/* Average Productivity - Always show this slot */}
+                  <div className="space-y-1">
+                    {displayPulses.some(p => p.ai_insights?.productivity_score) ? (
+                      <>
+                        <div className="text-2xl font-bold text-yellow-600 flex items-center justify-center space-x-1">
+                          <Star className="w-5 h-5" />
+                          <span>
+                            {Math.round(
+                              displayPulses
+                                .filter(p => p.ai_insights?.productivity_score)
+                                .reduce((sum, p) => sum + (p.ai_insights?.productivity_score || 0), 0) /
+                              displayPulses.filter(p => p.ai_insights?.productivity_score).length
+                            )}
+                          </span>
+                        </div>
+                        <div className="text-xs text-gray-600">Realizations</div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="text-2xl font-bold text-gray-300">
+                          <Star className="w-6 h-6 mx-auto" />
+                        </div>
+                        <div className="text-xs text-gray-400">Realizations</div>
+                      </>
+                    )}
+                  </div>
+                  
+                  {/* Dynamic Processing/Ready slot */}
+                  <div className="space-y-1 relative">
+                    {curatedStoppedPulses.length > 0 ? (
+                      <div className="animate-fadeIn">
+                        <div className="text-2xl font-bold text-yellow-500 flex items-center justify-center space-x-1 animate-pulse">
+                          <div>⚡</div>
+                          <span>{curatedStoppedPulses.length}</span>
+                        </div>
+                        <div className="text-xs text-gray-600">Processing</div>
+                      </div>
+                    ) : (
+                      <div className="animate-fadeIn">
+                        <div className="text-2xl font-bold text-gray-300 flex justify-center">
+                          <PulseShrineLogoSvg size={24} className="opacity-60" />
+                        </div>
+                        <div className="text-xs text-gray-400">Ready</div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                
+                {/* AI Enhancement Summary */}
+                {displayPulses.some(p => p.ai_enhanced) && (
+                  <div className="mt-4 pt-4 border-t border-gray-200/50">
+                    <div className="text-center text-sm text-gray-600">
+                      <span className="inline-flex items-center space-x-1 bg-gradient-to-r from-purple-100 to-blue-100 px-3 py-1 rounded-full">
+                        <Brain className="w-4 h-4 text-purple-600" />
+                        <span>
+                          {Math.round((displayPulses.filter(p => p.ai_enhanced).length / displayPulses.length) * 100)}% 
+                          of your runes are AI-enhanced
+                        </span>
+                      </span>
+                    </div>
+                  </div>
                 )}
-              </p>
+              </div>
             </div>
           )}
         </div>
+        
       </div>
     );
   };
@@ -650,8 +890,57 @@ export const PulseApp: React.FC<PulseAppProps> = ({ config, onReconfigure }) => 
     const progress = timeLeft > 0 ? ((totalDuration - timeLeft) / totalDuration) * 100 : 100;
 
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-blue-900 p-6 text-white">
-        <div className="max-w-2xl mx-auto text-center">
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-blue-900 p-6 text-white relative overflow-hidden">
+        {/* Breathing Garden Background */}
+        <div className="absolute inset-0 pointer-events-none opacity-10">
+          {/* Zen Garden Elements with Breathing Animation */}
+          <svg className="w-full h-full" viewBox="0 0 1200 800" fill="none">
+            {/* Water pond with breathing ripples */}
+            <ellipse cx="900" cy="500" rx="150" ry="80" fill="#4A90E2" opacity="0.3" className="animate-pulse-slow"/>
+            <ellipse cx="900" cy="500" rx="120" ry="60" fill="#6BA3F0" opacity="0.4" className="animate-pulse-slow" style={{animationDelay: '1s'}}/>
+            
+            {/* Breathing ripples */}
+            <ellipse cx="880" cy="480" rx="10" ry="5" fill="none" stroke="#4A90E2" strokeWidth="2" opacity="0.5" className="animate-pulse-gentle"/>
+            <ellipse cx="920" cy="520" rx="15" ry="8" fill="none" stroke="#4A90E2" strokeWidth="2" opacity="0.4" className="animate-pulse-gentle" style={{animationDelay: '2s'}}/>
+            
+            {/* Stepping stones with gentle pulse */}
+            <circle cx="200" cy="600" r="30" fill="#8B7355" opacity="0.4" className="animate-pulse-slow"/>
+            <circle cx="320" cy="560" r="35" fill="#9B8365" opacity="0.4" className="animate-pulse-slow" style={{animationDelay: '1.5s'}}/>
+            <circle cx="450" cy="520" r="32" fill="#8B7355" opacity="0.4" className="animate-pulse-slow" style={{animationDelay: '3s'}}/>
+            
+            {/* Zen rocks breathing */}
+            <ellipse cx="150" cy="300" rx="50" ry="30" fill="#A8A8A8" opacity="0.5" className="animate-pulse-gentle"/>
+            <ellipse cx="1000" cy="200" rx="40" ry="25" fill="#B8B8B8" opacity="0.4" className="animate-pulse-gentle" style={{animationDelay: '2.5s'}}/>
+            
+            {/* Bamboo silhouettes with gentle sway */}
+            <g className="animate-pulse-slow">
+              <rect x="80" y="100" width="12" height="200" fill="#4A7C59" opacity="0.4"/>
+              <rect x="100" y="80" width="8" height="180" fill="#5A8C69" opacity="0.4"/>
+              <rect x="118" y="120" width="10" height="160" fill="#4A7C59" opacity="0.4"/>
+            </g>
+            
+            {/* Sacred path with breathing glow */}
+            <path d="M0,650 Q200,630 400,650 T800,650" stroke="#4A90E2" strokeWidth="3" fill="none" opacity="0.3" className="animate-pulse-gentle"/>
+            <path d="M800,670 Q1000,650 1200,670" stroke="#4A90E2" strokeWidth="3" fill="none" opacity="0.3" className="animate-pulse-gentle" style={{animationDelay: '1s'}}/>
+            
+            {/* Meditation circles with breathing rhythm */}
+            <circle cx="600" cy="150" r="20" fill="none" stroke="#ffffff" strokeWidth="1" opacity="0.2" className="animate-pulse-gentle"/>
+            <circle cx="600" cy="150" r="35" fill="none" stroke="#ffffff" strokeWidth="1" opacity="0.1" className="animate-pulse-gentle" style={{animationDelay: '1s'}}/>
+            <circle cx="600" cy="150" r="50" fill="none" stroke="#ffffff" strokeWidth="1" opacity="0.05" className="animate-pulse-gentle" style={{animationDelay: '2s'}}/>
+          </svg>
+        </div>
+        
+        {/* Floating zen particles */}
+        <div className="absolute inset-0 pointer-events-none">
+          <div className="absolute top-20 left-20 w-2 h-2 bg-blue-300 rounded-full opacity-20 animate-pulse-slow"></div>
+          <div className="absolute top-40 right-32 w-1 h-1 bg-purple-300 rounded-full opacity-30 animate-pulse-slow" style={{animationDelay: '2s'}}></div>
+          <div className="absolute bottom-60 left-1/4 w-1.5 h-1.5 bg-green-300 rounded-full opacity-25 animate-pulse-slow" style={{animationDelay: '4s'}}></div>
+          <div className="absolute top-1/3 right-1/4 w-1 h-1 bg-white rounded-full opacity-20 animate-pulse-slow" style={{animationDelay: '6s'}}></div>
+          <div className="absolute bottom-40 right-20 w-2 h-2 bg-indigo-300 rounded-full opacity-15 animate-pulse-slow" style={{animationDelay: '3s'}}></div>
+          <div className="absolute top-60 left-1/2 w-1 h-1 bg-cyan-300 rounded-full opacity-25 animate-pulse-slow" style={{animationDelay: '5s'}}></div>
+        </div>
+
+        <div className="max-w-2xl mx-auto text-center relative z-10">
           <div className="bg-gradient-to-r from-purple-100 to-blue-100 p-4 rounded-lg border border-purple-200 mb-6">
             <div className="flex items-start space-x-3">
               <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-blue-500 rounded-full flex items-center justify-center text-white font-bold">
@@ -667,7 +956,13 @@ export const PulseApp: React.FC<PulseAppProps> = ({ config, onReconfigure }) => 
 
           <div className="bg-white/10 backdrop-blur-sm rounded-xl p-8 border border-white/20 mb-8">
             <div className="mb-6">
-              <EnergyIcon className={`w-12 h-12 mx-auto mb-4 ${energyIcons[selectedEnergy as keyof typeof energyIcons]?.color || 'text-purple-500'}`} />
+              {selectedEnergy === 'creation' ? (
+                <div className="flex justify-center mb-4">
+                  <PulseShrineLogoSvg size={48} variant="white" />
+                </div>
+              ) : (
+                <EnergyIcon className={`w-12 h-12 mx-auto mb-4 ${energyIcons[selectedEnergy as keyof typeof energyIcons]?.color || 'text-purple-500'}`} />
+              )}
               <h3 className="text-xl font-semibold mb-2">{activePulse.intent}</h3>
               <p className="text-sm text-gray-300 capitalize">{selectedEnergy} energy</p>
             </div>
@@ -692,7 +987,7 @@ export const PulseApp: React.FC<PulseAppProps> = ({ config, onReconfigure }) => 
                   strokeLinecap="round"
                   strokeDasharray={`${2 * Math.PI * 45}`}
                   strokeDashoffset={`${2 * Math.PI * 45 * (1 - progress / 100)}`}
-                  className="transition-all duration-1000"
+                  className="transition-all duration-1000 animate-pulse-gentle"
                 />
                 <defs>
                   <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="0%">
@@ -702,7 +997,7 @@ export const PulseApp: React.FC<PulseAppProps> = ({ config, onReconfigure }) => 
                 </defs>
               </svg>
               <div className="absolute inset-0 flex items-center justify-center">
-                <div className="text-4xl font-bold">{formatTime(timeLeft)}</div>
+                <div className="text-4xl font-bold animate-pulse-slow">{formatTime(timeLeft)}</div>
               </div>
             </div>
 
@@ -852,16 +1147,22 @@ export const PulseApp: React.FC<PulseAppProps> = ({ config, onReconfigure }) => 
         isOpen={showConfigModal}
         onClose={() => setShowConfigModal(false)}
         onConfigured={(newConfig) => {
+          // Save the config to localStorage
+          updateConfig(newConfig);
+          
+          // Always update the userIdRef
+          userIdRef.current = newConfig.userId;
+          
           // If user changes the config significantly, ask them to restart
           if (newConfig.apiBaseUrl !== config.apiBaseUrl || newConfig.apiKey !== config.apiKey) {
             if (confirm('API configuration changed. Do you want to restart the app to apply changes?')) {
               onReconfigure();
             } else {
+              // User declined restart, but config is still saved
               setShowConfigModal(false);
             }
           } else {
-            // Just update the userId
-            userIdRef.current = newConfig.userId;
+            // Minor changes (userId only) - just close modal
             setShowConfigModal(false);
           }
         }}

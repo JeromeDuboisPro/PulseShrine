@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Settings, ExternalLink, CheckCircle, X } from 'lucide-react';
-import { ApiConfig, defaultConfig, updateConfig } from '../config';
+import { ApiConfig, defaultConfig } from '../config';
+import { PulseShrineLogoSvg } from './PulseShrineLogoSvg';
 
 interface ConfigurationModalProps {
   isOpen: boolean;
@@ -57,9 +58,9 @@ export const ConfigurationModal: React.FC<ConfigurationModalProps> = ({
         userId: userId.trim()
       };
       
-      updateConfig(newConfig);
+      // Let the parent handle saving and state management
       onConfigured(newConfig);
-      onClose();
+      // Don't call onClose() here - let the parent decide
     }
   };
 
@@ -91,7 +92,7 @@ export const ConfigurationModal: React.FC<ConfigurationModalProps> = ({
         <div className="p-6 border-b border-gray-200">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
-              <Settings className="w-6 h-6 text-purple-600" />
+              <PulseShrineLogoSvg size={48} className="drop-shadow-md transition-transform duration-300 hover:scale-105" />
               <h2 className="text-2xl font-bold text-gray-800">Configure PulseShrine API</h2>
             </div>
             <button
