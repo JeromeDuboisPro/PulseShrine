@@ -1,4 +1,5 @@
 import logging
+from decimal import Decimal
 
 from shared.models.pulse import ArchivedPulse
 from shared.services.aws import get_ddb_table
@@ -9,6 +10,18 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_NB_ITEMS = 20
 MAX_NB_ITEMS = DEFAULT_NB_ITEMS
+
+
+def convert_decimals_to_float(obj):
+    """Recursively convert Decimal values to float for API compatibility"""
+    if isinstance(obj, Decimal):
+        return float(obj)
+    elif isinstance(obj, dict):
+        return {key: convert_decimals_to_float(value) for key, value in obj.items()}
+    elif isinstance(obj, list):
+        return [convert_decimals_to_float(item) for item in obj]
+    else:
+        return obj
 
 
 def get_ingested_pulses(
@@ -33,7 +46,9 @@ def get_ingested_pulses(
             Limit=nb_items,
         )
 
-        return [ArchivedPulse(**item) for item in response["Items"]]
+        # Convert Decimals to floats before creating ArchivedPulse objects
+        items = [convert_decimals_to_float(item) for item in response["Items"]]
+        return [ArchivedPulse(**item) for item in items]
 
     except ClientError as e:
         logger.error(

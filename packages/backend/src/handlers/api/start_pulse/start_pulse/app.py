@@ -12,8 +12,8 @@ from shared.models.pulse import (
     StartPulse,
 )
 
-from models import PulseCreationErrorAlreadyPresent
-from services import start_pulse
+from start_pulse.models import PulseCreationErrorAlreadyPresent
+from start_pulse.services import start_pulse
 
 # Initialize the logger
 logger = Logger()

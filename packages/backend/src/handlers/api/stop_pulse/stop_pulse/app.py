@@ -4,11 +4,11 @@ from aws_lambda_powertools.event_handler import APIGatewayRestResolver
 from aws_lambda_powertools.event_handler.api_gateway import CORSConfig
 from aws_lambda_powertools.event_handler.exceptions import BadRequestError
 from aws_lambda_powertools.utilities.typing import LambdaContext
-from datetime import datetime, timezone
-from pydantic import BaseModel, ValidationError
+from pydantic import ValidationError
 from typing import Any
 
-from services import stop_pulse
+from stop_pulse.models import StopPulseRequest
+from stop_pulse.services import stop_pulse
 
 # Initialize the logger
 logger = Logger()
@@ -24,23 +24,6 @@ cors_config = CORSConfig(
 
 # Initialize the APIGatewayRestResolver
 app = APIGatewayRestResolver(cors=cors_config)
-
-
-class StopPulseRequest(BaseModel):
-    user_id: str
-    reflection: str
-    reflection_emotion: str | None = None
-    stopped_at: str | None = None
-
-    def stopped_at_dt(self) -> datetime:
-        """Return the stopped_at time as timezone-aware datetime."""
-        if self.stopped_at:
-            dt = datetime.fromisoformat(self.stopped_at)
-            # Ensure timezone-aware
-            if dt.tzinfo is None:
-                return dt.replace(tzinfo=timezone.utc)
-            return dt
-        return datetime.now(timezone.utc)
 
 
 @app.post("/stop-pulse")

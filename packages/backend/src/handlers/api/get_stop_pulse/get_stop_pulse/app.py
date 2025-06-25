@@ -7,16 +7,16 @@ from aws_lambda_powertools.utilities.typing import LambdaContext
 from typing import Any
 
 from shared.models.pulse import (
-    ArchivedPulse,
+    StopPulse,
 )
 
-from services import DEFAULT_NB_ITEMS, get_ingested_pulses
+from get_stop_pulse.services import get_stop_pulses
 
 # Initialize the logger
 logger = Logger()
 
 # Retrieve environment variable
-INGESTED_PULSE_TABLE_NAME = os.environ["INGESTED_PULSE_TABLE_NAME"]
+STOP_PULSE_TABLE_NAME = os.environ["STOP_PULSE_TABLE_NAME"]
 
 # Configure CORS
 cors_config = CORSConfig(
@@ -27,8 +27,8 @@ cors_config = CORSConfig(
 app = APIGatewayRestResolver(cors=cors_config)
 
 
-@app.get("/get-ingested-pulses")
-def get_ingested_pulses_handler() -> list[ArchivedPulse]:
+@app.get("/get-stop-pulses")
+def get_stop_pulses_handler() -> list[StopPulse]:
     """
     Handler function to get the start pulse of a user.
     """
@@ -36,19 +36,13 @@ def get_ingested_pulses_handler() -> list[ArchivedPulse]:
     if not user_id:
         logger.error("Missing user_id in query parameters")
         raise BadRequestError("Missing user_id in query parameters")
-    nb_items = app.current_event.get_query_string_value("nb_items")
-    nb_items = int(nb_items or DEFAULT_NB_ITEMS)
-    logger.warning(f"Retrieving current IngestedPulses for user {user_id}")
+    logger.warning(f"Retrieving current StopPulses for user {user_id}")
 
     try:
         results = list(
-            get_ingested_pulses(
-                user_id=user_id, nb_items=nb_items, table_name=INGESTED_PULSE_TABLE_NAME
-            )
+            get_stop_pulses(user_id=user_id, table_name=STOP_PULSE_TABLE_NAME)
         )
-        print(
-            f"For user {user_id} got the following last {nb_items} ArchivedPulse: {results}"
-        )
+        print(f"For user {user_id} got the following StopPulses: {results}")
         return results
 
     except Exception as exc:

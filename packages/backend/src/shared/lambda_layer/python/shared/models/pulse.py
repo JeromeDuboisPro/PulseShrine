@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 from functools import cached_property
-from pydantic import BaseModel, Field, computed_field
+from pydantic import BaseModel, Field, computed_field, field_validator
 from typing import List, Optional
 
 
@@ -136,6 +136,36 @@ class ArchivedPulse(StopPulse):
         default="",
         description="Generated badge for the pulse, used for display purposes",
     )
+    
+    # AI Enhancement Data
+    ai_enhanced: Optional[bool] = Field(
+        default=False,
+        description="Whether this pulse was enhanced with AI",
+    )
+    ai_cost_cents: Optional[float] = Field(
+        default=None,
+        description="Cost in cents for AI enhancement (supports sub-cent precision)",
+    )
+    
+    @field_validator('ai_cost_cents')
+    @classmethod
+    def round_cost_precision(cls, v):
+        """Round cost to 3 decimal places for consistent precision"""
+        if v is not None:
+            return round(float(v), 3)
+        return v
+    ai_insights: Optional[dict] = Field(
+        default=None,
+        description="AI-generated insights about the pulse",
+    )
+    triggered_rewards: Optional[list] = Field(
+        default=None,
+        description="Rewards triggered by this pulse",
+    )
+    selection_info: Optional[dict] = Field(
+        default=None,
+        description="Information about AI selection decision",
+    )
 
     @computed_field
     @cached_property
@@ -143,7 +173,15 @@ class ArchivedPulse(StopPulse):
         """Return the stopped time 'reversed to optimize most recent search in ddb."""
         return int(
             (
-                datetime(year=9999, month=12, day=31, hour=23, minute=59, second=59, tzinfo=timezone.utc)
+                datetime(
+                    year=9999,
+                    month=12,
+                    day=31,
+                    hour=23,
+                    minute=59,
+                    second=59,
+                    tzinfo=timezone.utc,
+                )
                 - self.stopped_at_dt
             ).total_seconds()
         )

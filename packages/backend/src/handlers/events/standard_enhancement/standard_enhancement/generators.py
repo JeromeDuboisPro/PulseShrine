@@ -1,7 +1,7 @@
 import random
 from typing import List
 
-from data import IntensityLevels, IntentData, SentimentAdjectives
+from standard_enhancement.data import IntensityLevels, IntentData, SentimentAdjectives
 from shared.models.pulse import StopPulse
 import logging
 
@@ -80,7 +80,7 @@ class PulseTitleGenerator:
         except Exception as e:
             # Fallback title
             print(f"Error generating title: {e}")
-            return f"Session Complete! ✨\n\nKeep up the great work! 🌟"
+            return "Session Complete! ✨\n\nKeep up the great work! 🌟"
 
     @staticmethod
     def generate_multiple_options(pulse_data: StopPulse, count: int = 3) -> List[str]:
@@ -198,7 +198,6 @@ class PulseTitleGenerator:
                 }
 
                 journey_key = (intent_emotion.lower(), reflection_emotion.lower())
-                print(f"journey Key: {journey_key}")
                 if journey_key in emotion_journey_badges:
                     return emotion_journey_badges[journey_key]
 

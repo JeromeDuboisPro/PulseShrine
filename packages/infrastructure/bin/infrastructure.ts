@@ -22,6 +22,8 @@ const lambdaStack = new LambdaStack(app, 'LambdaStack', {
   startPulseTable: infraStack.startPulseTable,
   stopPulseTable: infraStack.stopPulseTable,
   ingestedPulseTable: infraStack.ingestedPulseTable,
+  aiUsageTrackingTable: infraStack.aiUsageTrackingTable,
+  bedrockModelId: process.env.BEDROCK_MODEL_ID, // Allow override via env var
 });
 
 // SfnStack depends on both InfrastructureStack and LambdaStack

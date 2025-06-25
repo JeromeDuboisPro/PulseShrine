@@ -7,7 +7,7 @@ from functools import cache
 
 def get_region_name() -> str:
     """
-    Get the AWS region name from environment variable. 
+    Get the AWS region name from environment variable.
     Uses AWS_REGION if set, otherwise lets boto3 use its default region resolution.
 
     Returns:

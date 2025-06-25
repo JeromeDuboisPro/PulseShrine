@@ -6,11 +6,7 @@ from aws_lambda_powertools.event_handler.exceptions import BadRequestError
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from typing import Any
 
-from shared.models.pulse import (
-    StartPulse,
-)
-
-from services import get_start_pulse
+from get_start_pulse.services import get_start_pulse
 
 # Initialize the logger
 logger = Logger()
