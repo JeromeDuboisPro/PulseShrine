@@ -79,7 +79,7 @@ export const PulseApp: React.FC<PulseAppProps> = ({ config, onReconfigure }) => 
       try {
         setError(null);
         const [ingested, stopped, started] = await Promise.all([
-          PulseAPI.getIngestedPulses(userIdRef.current),
+          PulseAPI.getIngestedPulses(userIdRef.current, MAX_STONES),
           PulseAPI.getStopPulses(userIdRef.current),
           PulseAPI.getStartPulse(userIdRef.current)
         ]);
@@ -463,17 +463,19 @@ export const PulseApp: React.FC<PulseAppProps> = ({ config, onReconfigure }) => 
     );
   };
 
+  // Configuration constant for max stones to display
+  const MAX_STONES = 24;
+
   const renderShrine = () => {
     // Combine all pulses for display
     const ingestedIdsSet = new Set(completedPulses.map(p => p.pulse_id));
     const curatedStoppedPulses = stoppedPulses.filter(p => !ingestedIdsSet.has(p.pulse_id));
     
     let displayPulses = [...completedPulses];
-    const maxStones = 18;
     
     // Add stopped pulses that haven't been ingested yet (processing state)
     curatedStoppedPulses.forEach(pulse => {
-      if (displayPulses.length < maxStones) {
+      if (displayPulses.length < MAX_STONES) {
         displayPulses.push({
           ...pulse,
           gen_title: pulse.gen_title || '⚡ Processing...',

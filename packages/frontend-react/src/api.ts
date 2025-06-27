@@ -191,9 +191,13 @@ export const PulseAPI = {
   },
 
   // Get processed/ingested pulses for user
-  getIngestedPulses: async (userId: string): Promise<IngestedPulse[]> => {
+  getIngestedPulses: async (userId: string, nbItems?: number): Promise<IngestedPulse[]> => {
     try {
-      const result = await callPulseAPI<IngestedPulse[]>('GET', '/get-ingested-pulses', { user_id: userId });
+      const params: any = { user_id: userId };
+      if (nbItems !== undefined) {
+        params.nb_items = nbItems;
+      }
+      const result = await callPulseAPI<IngestedPulse[]>('GET', '/get-ingested-pulses', params);
       return Array.isArray(result) ? result : [];
     } catch (error) {
       if (error instanceof ApiError && error.status === 404) {

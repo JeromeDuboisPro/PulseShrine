@@ -154,6 +154,7 @@ export class ApiGatewayStack extends cdk.Stack {
         apiKeyRequired: true,
         requestParameters: {
           "method.request.querystring.user_id": true, // Require user_id as a query parameter
+          "method.request.querystring.nb_items": false, // Optional nb_items as a query parameter
         },
       },
     );
