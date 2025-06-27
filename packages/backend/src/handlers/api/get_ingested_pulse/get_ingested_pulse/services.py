@@ -9,7 +9,7 @@ from boto3.dynamodb.conditions import Key
 logger = logging.getLogger(__name__)
 
 DEFAULT_NB_ITEMS = 20
-MAX_NB_ITEMS = DEFAULT_NB_ITEMS
+MAX_NB_ITEMS = 100
 
 
 def convert_decimals_to_float(obj):
