@@ -12,16 +12,15 @@ class PulseCreationError(Exception):
 
 class PulseBase(BaseModel):
     user_id: str
-    intent: str
+    intent: str = Field(max_length=200, description="User's intention, max 200 characters")
     pulse_id: Optional[str] = Field(default=None)
     start_time: Optional[datetime | str] = Field(
         default_factory=lambda: datetime.now(timezone.utc),
         description="Start time of the pulse, defaults to UTC now if not provided",
     )
-    duration_seconds: Optional[int] = Field(
-        default=None,
-        ge=0,
-        description="Duration in seconds; must be a positive integer if provided",
+    duration_seconds: int = Field(
+        ge=1,
+        description="Duration in seconds; must be a positive integer",
     )
     intent_emotion: Optional[str] = Field(
         default=None, description="Energy type for the pulse (creation, focus, etc.)"
@@ -75,7 +74,7 @@ class StartPulse(PulseBase):
 
 
 class StopPulse(PulseBase):
-    reflection: str
+    reflection: str = Field(max_length=200, description="User's reflection, max 200 characters")
     reflection_emotion: Optional[str] = Field(
         default=None, description="Emotion felt after completing the pulse"
     )
@@ -104,23 +103,9 @@ class StopPulse(PulseBase):
     @cached_property
     def actual_duration_seconds(self) -> int:
         actual_duration = int((self.stopped_at_dt - self.start_time_dt).total_seconds())
-        duration = (
-            actual_duration
-            if self.duration_seconds is None
-            else min(actual_duration, self.duration_seconds)
-        )
-        return duration
+        # Return the minimum of actual duration and planned duration
+        return min(actual_duration, self.duration_seconds)
 
-    def model_post_init(self, _):
-        if self.duration_seconds is None and self.start_time and self.stopped_at_dt:
-            try:
-                start = self.start_time_dt
-                stop = self.stopped_at_dt
-                object.__setattr__(
-                    self, "duration_seconds", int((stop - start).total_seconds())
-                )
-            except Exception:
-                pass
 
 
 class ArchivedPulse(StopPulse):
