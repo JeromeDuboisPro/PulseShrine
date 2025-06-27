@@ -53,7 +53,7 @@ export const SetupScreen: React.FC<SetupScreenProps> = ({ onConfigured }) => {
               PulseShrine
             </h1>
           </div>
-          <p className="text-gray-600 text-lg">Sacred Space of Mindful Productivity</p>
+          <p className="text-gray-600 text-lg">Mindful Space of Focused Productivity</p>
           <p className="text-sm text-gray-500 mt-2">Please configure your AWS API connection to begin</p>
         </div>
 
@@ -125,7 +125,7 @@ export const SetupScreen: React.FC<SetupScreenProps> = ({ onConfigured }) => {
               className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
             />
             <p className="text-xs text-gray-500 mt-1">
-              Unique identifier for your meditation data (default: jerome)
+              Unique identifier for your focus data (default: jerome)
             </p>
           </div>
 

@@ -8,10 +8,12 @@ export interface StartPulse {
   timestamp?: number;
   inverted_timestamp?: number;
   start_time?: string;
-  duration_seconds?: number;
+  duration_seconds: number;
   intent_emotion?: string;
   gen_title?: string;
   gen_badge?: string;
+  remaining_seconds?: number;
+  server_time?: string;
 }
 
 export interface StopPulse {
@@ -202,7 +204,7 @@ export const PulseAPI = {
   },
 
   // Start a new pulse
-  startPulse: async (userId: string, intent: string, durationSeconds?: number, intentEmotion?: string): Promise<StartPulse> => {
+  startPulse: async (userId: string, intent: string, durationSeconds: number, intentEmotion?: string): Promise<StartPulse> => {
     if (!intent.trim()) {
       throw new ApiError('Intention cannot be empty', 400, 'INVALID_INPUT');
     }
@@ -212,9 +214,7 @@ export const PulseAPI = {
       intent: intent.trim()
     };
     
-    if (durationSeconds !== undefined) {
-      payload.duration_seconds = durationSeconds;
-    }
+    payload.duration_seconds = durationSeconds;
     
     if (intentEmotion) {
       payload.intent_emotion = intentEmotion;
