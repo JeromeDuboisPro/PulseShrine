@@ -7,6 +7,7 @@ from aws_lambda_powertools.utilities.typing import LambdaContext
 from typing import Any
 
 from get_start_pulse.services import get_start_pulse
+from datetime import datetime, timezone
 
 # Initialize the logger
 logger = Logger()
@@ -42,6 +43,15 @@ def get_start_pulse_handler() -> dict[str, Any] | None:
             # Ensure start_time includes timezone info
             if hasattr(result, "start_time_dt") and result.start_time_dt:
                 data["start_time"] = result.start_time_dt.isoformat()
+            
+            # Calculate remaining time on the server
+            current_time = datetime.now(timezone.utc)
+            elapsed_seconds = (current_time - result.start_time_dt).total_seconds()
+            remaining_seconds = max(0, result.duration_seconds - elapsed_seconds)
+            data["remaining_seconds"] = int(remaining_seconds)
+            data["server_time"] = current_time.isoformat()
+            logger.info(f"Calculated remaining time: {remaining_seconds}s for user {user_id}")
+            
             return data
         return None
 
