@@ -10,6 +10,7 @@ from shared.models.pulse import StopPulse
 # Import budget service for usage tracking
 try:
     from shared.services.ai_budget_service import AIBudgetService
+    from shared.ai_tracking.services.tracking_integration import AITrackingIntegration
 except ImportError:
     # Fallback imports for local testing
     import sys
@@ -19,15 +20,19 @@ except ImportError:
         os.path.join(os.path.dirname(__file__), "../../shared/lambda_layer/python")
     )
     from shared.services.ai_budget_service import AIBudgetService
+    from shared.ai_tracking.services.tracking_integration import AITrackingIntegration
 
 # Initialize the logger
 logger = Logger()
 
 # Initialize budget service (will be lazy-loaded)
 ai_usage_table_name = os.environ.get(
-    "AI_USAGE_TRACKING_TABLE_NAME", "ai-usage-tracking"
+    "AI_USAGE_TRACKING_TABLE_NAME", "ps-ai-usage-tracking"
 )
 budget_service = AIBudgetService(ai_usage_table_name)
+
+# Initialize tracking integration
+tracking_integration = AITrackingIntegration(ai_usage_table_name)
 
 # Initialize AWS clients - use default region from environment/credentials
 try:
@@ -146,7 +151,9 @@ def estimate_bedrock_cost(text_length: int, model_id: str) -> float:
 
     # Base pricing per 1M tokens (may vary by region)
     base_pricing = {
-        "amazon.titan-text-express-v1": 0.13,  # $0.13 per 1M input tokens
+        "us.amazon.nova-lite-v1:0": 0.06,  # $0.06 per 1M input tokens
+        "eu.amazon.nova-lite-v1:0": 0.06,  # $0.06 per 1M input tokens  
+        "apac.amazon.nova-lite-v1:0": 0.06,  # $0.06 per 1M input tokens
         "anthropic.claude-3-haiku-20240307-v1:0": 0.25,  # $0.25 per 1M input tokens
     }
 
@@ -162,7 +169,7 @@ def estimate_bedrock_cost(text_length: int, model_id: str) -> float:
         "ap-southeast-2": 1.0,  # Same as base pricing
     }
 
-    base_rate = base_pricing.get(model_id, 0.13)  # Default to Titan Express pricing
+    base_rate = base_pricing.get(model_id, 0.06)  # Default to Nova Lite pricing
     regional_multiplier = regional_multipliers.get(current_region, 1.0)
 
     estimated_cost = (estimated_tokens / 1_000_000) * base_rate * regional_multiplier
@@ -240,8 +247,12 @@ def get_best_available_model(preferred_model: str) -> str:
     fallback_models = [
         # Try Claude Haiku (universally available)
         "anthropic.claude-3-haiku-20240307-v1:0",
-        # Try Titan Express as last resort
-        "amazon.titan-text-express-v1",
+        # Try US Nova Lite if available
+        "us.amazon.nova-lite-v1:0",
+        # Try EU Nova Lite if available  
+        "eu.amazon.nova-lite-v1:0",
+        # Try APAC Nova Lite if available
+        "apac.amazon.nova-lite-v1:0",
     ]
 
     for model in fallback_models:
@@ -334,10 +345,10 @@ def enhance_pulse_title(pulse_values: Dict[str, Any], config: Dict[str, Any]) ->
         # Even Titan gets more sophisticated prompt
         prompt = f"""Create an expressive, sophisticated title for this breakthrough session:
 
-ACTIVITY: {stop_pulse.intent[:120]}
+ACTIVITY: {stop_pulse.intent[:200]}
 DURATION: {duration_minutes:.0f} minutes of deep work
 EMOTIONAL ARC: {start_emotion} energy → {end_emotion} achievement
-BREAKTHROUGH: {stop_pulse.reflection[:200]}...
+BREAKTHROUGH: {stop_pulse.reflection[:200]}
 
 Create a title that captures:
 - The specific technical achievement (not generic)
@@ -357,10 +368,10 @@ Your sophisticated title (under 70 chars):"""
         prompt = f"""Craft a sophisticated, expressive achievement title that captures the essence of this groundbreaking session:
 
 DEEP WORK SESSION ANALYSIS:
-• Activity: {stop_pulse.intent}
+• Activity: {stop_pulse.intent[:200]}
 • Duration: {duration_minutes:.1f} minutes of focused innovation
 • Emotional Journey: {start_emotion} mindset → {end_emotion} achievement
-• Key Breakthrough: {stop_pulse.reflection[:300]}
+• Key Breakthrough: {stop_pulse.reflection[:200]}
 • Tags: {', '.join(stop_pulse.tags or [])}
 
 TITLE REQUIREMENTS:
@@ -386,19 +397,40 @@ TITLE:"""
 
     # Route to appropriate model with higher token limits for sophisticated output
     if "nova" in model_id.lower():
-        result = call_bedrock_nova(prompt, model_id, max_tokens=120)
+        result = call_bedrock_nova(prompt, model_id, max_tokens=150)
     elif "titan" in model_id.lower():
-        result = call_bedrock_titan(prompt, model_id, max_tokens=120)
+        result = call_bedrock_titan(prompt, model_id, max_tokens=150)
     else:
         # Fallback to Claude
-        result = call_bedrock_claude(prompt, model_id, max_tokens=120)
+        result = call_bedrock_claude(prompt, model_id, max_tokens=150)
 
     if result:
         # Clean up the result
         result = result.strip()
+        
+        # Handle Nova's verbose response format
+        if "TITLE:" in result:
+            # Extract the title part after "TITLE:"
+            title_start = result.find("TITLE:") + len("TITLE:")
+            result = result[title_start:].strip()
+        
+        # Take only the first line (Nova may add explanations)
+        lines = result.split('\n')
+        result = lines[0].strip()
+        
         # Remove quotes if present
         if result.startswith('"') and result.endswith('"'):
             result = result[1:-1]
+        
+        # Remove any prefixes like "Title:" or "SOPHISTICATED TITLE:"
+        for prefix in ["Title:", "TITLE:", "title:", "SOPHISTICATED TITLE:"]:
+            if result.startswith(prefix):
+                result = result[len(prefix):].strip()
+        
+        # Allow longer titles (up to 120 chars for sophisticated titles)
+        if len(result) > 120:
+            result = result[:117] + "..."
+        
         return result
 
     logger.error("Failed to generate pulse title from AI, using fallback")
@@ -444,11 +476,21 @@ TITLE:"""
 
 
 def clean_titan_json_response(response: str) -> str:
-    """Clean Titan response to extract raw JSON from formatted output."""
+    """Clean Titan/Nova response to extract raw JSON from formatted output."""
     import re
 
     # Remove common markdown formatting
     response = response.strip()
+    
+    # Handle Nova's verbose response format
+    if "RAW JSON:" in response:
+        # Extract the JSON part after "RAW JSON:"
+        json_start = response.find("RAW JSON:") + len("RAW JSON:")
+        response = response[json_start:].strip()
+    
+    # Also check for "JSON:" prefix
+    if response.startswith("JSON:"):
+        response = response[5:].strip()
 
     # Remove tabular-data-json wrapper if present
     if "tabular-data-json" in response:
@@ -508,10 +550,10 @@ def generate_ai_insights(
     prompt = f"""Analyze this breakthrough session and return sophisticated insights as RAW JSON:
 
 DEEP SESSION ANALYSIS:
-• Core Innovation: {stop_pulse.intent}
+• Core Innovation: {stop_pulse.intent[:200]}
 • Duration: {duration_minutes:.1f} minutes of focused excellence  
 • Emotional Evolution: {start_emotion} → {end_emotion}
-• Breakthrough Details: {stop_pulse.reflection}
+• Breakthrough Details: {stop_pulse.reflection[:200]}
 • Technical Domain: {', '.join(stop_pulse.tags or [])}
 {emotion_shift}
 
@@ -540,11 +582,11 @@ RAW JSON:"""
 
     # Route to appropriate model with higher token limits for sophisticated insights
     if "nova" in model_id.lower():
-        result = call_bedrock_nova(prompt, model_id, max_tokens=500)
+        result = call_bedrock_nova(prompt, model_id, max_tokens=600)
     elif "titan" in model_id.lower():
-        result = call_bedrock_titan(prompt, model_id, max_tokens=500)
+        result = call_bedrock_titan(prompt, model_id, max_tokens=600)
     else:
-        result = call_bedrock_claude(prompt, model_id, max_tokens=500)
+        result = call_bedrock_claude(prompt, model_id, max_tokens=600)
 
     if result:
         try:
@@ -615,57 +657,99 @@ def generate_ai_badge(pulse_values: Dict[str, Any], config: Dict[str, Any]) -> s
     start_emotion = stop_pulse.intent_emotion or "focused"
     end_emotion = stop_pulse.reflection_emotion or "accomplished"
 
-    prompt = f"""Create a prestigious, sophisticated achievement badge for this breakthrough session:
+    prompt = f"""Generate a prestigious achievement badge for this session.
 
-ACHIEVEMENT ANALYSIS:
-• Core Work: {stop_pulse.intent[:150]}
-• Duration: {duration_minutes} minutes of focused excellence
-• Emotional Evolution: {start_emotion} → {end_emotion}
-• Major Breakthrough: {stop_pulse.reflection[:250]}...
-• Domain: {', '.join(stop_pulse.tags or [])}
+SESSION DETAILS:
+- Work: {stop_pulse.intent[:200]}
+- Duration: {duration_minutes} minutes
+- Result: {stop_pulse.reflection[:200]}
 
-BADGE REQUIREMENTS:
-• Format: [emoji] [Word1] [Word2]
-• Words must be SOPHISTICATED and SPECIFIC to the achievement
-• Capture the TECHNICAL DOMAIN and BREAKTHROUGH NATURE
-• Use prestigious language (Pioneer, Visionary, Revolutionary, Architect, etc.)
-• Emoji must precisely match the technical field
+REQUIRED OUTPUT FORMAT:
+Return ONLY the badge in this exact format:
+[emoji] [Word1] [Word2]
 
-SOPHISTICATED EXAMPLES:
-• AI Research: 🧠 Neural Architect
-• ML Innovation: 🚀 Algorithm Pioneer  
-• Data Science: 📊 Insight Visionary
-• AI Engineering: ⚡ Intelligence Revolutionary
-• Research Breakthrough: 🔬 Discovery Champion
-• Technical Innovation: 💡 Innovation Virtuoso
-• Deep Learning: 🧬 Transformer Genius
-• AI Systems: 🎯 Architecture Mastermind
+Examples of CORRECT output:
+🧠 Neural Architect
+🚀 Algorithm Pioneer
+📊 Data Visionary
+⚡ Code Revolutionary
+🔬 Research Champion
 
-Analyze the specific technical achievement described in the reflection. Create a badge that reflects world-class expertise and breakthrough innovation.
+RULES:
+- Start with ONE emoji
+- Follow with exactly 2-3 words
+- Use sophisticated terms: Pioneer, Architect, Visionary, Revolutionary, Champion, Genius, Master
+- NO markdown, NO formatting, NO explanations
+- NO "BADGE:" prefix
+- NO analysis or extra text
 
-PRESTIGIOUS BADGE:"""
+Your badge:"""
 
     model_id = config["bedrock_model_id"]
 
-    # Route to appropriate model with sufficient tokens for sophisticated badges
+    # Route to appropriate model with sufficient tokens for badge generation
     if "nova" in model_id.lower():
-        result = call_bedrock_nova(prompt, model_id, max_tokens=40)
+        result = call_bedrock_nova(prompt, model_id, max_tokens=60)
     elif "titan" in model_id.lower():
-        result = call_bedrock_titan(prompt, model_id, max_tokens=40)
+        result = call_bedrock_titan(prompt, model_id, max_tokens=60)
     else:
-        result = call_bedrock_claude(prompt, model_id, max_tokens=40)
+        result = call_bedrock_claude(prompt, model_id, max_tokens=60)
 
     if result:
-        # Clean up the result
+        # Clean up the result aggressively for Nova's verbose responses
         result = result.strip()
-        # Remove quotes if present
-        if result.startswith('"') and result.endswith('"'):
-            result = result[1:-1]
-
-        # Validate format (emoji + 2 words)
+        
+        # Remove all markdown formatting
+        import re
+        result = re.sub(r'\*\*([^*]+)\*\*', r'\1', result)  # Remove **bold**
+        result = re.sub(r'\*([^*]+)\*', r'\1', result)      # Remove *italic*
+        
+        # Handle various Nova verbose patterns
+        verbose_patterns = [
+            "PRESTIGIOUS BADGE:",
+            "**PRESTIGIOUS BADGE:**", 
+            "Your badge:",
+            "Badge:",
+            "BADGE:",
+            "Analysis:",
+            "**Analysis:**"
+        ]
+        
+        for pattern in verbose_patterns:
+            if pattern in result:
+                # Extract content after the pattern
+                parts = result.split(pattern, 1)
+                if len(parts) > 1:
+                    result = parts[1].strip()
+        
+        # Split into lines and find the badge line
+        lines = [line.strip() for line in result.split('\n') if line.strip()]
+        
+        for line in lines:
+            # Skip empty lines or lines that are clearly explanations
+            if not line or line.startswith('-') or line.startswith('•') or 'Core Work:' in line or 'Analysis:' in line:
+                continue
+                
+            # Look for emoji + words pattern
+            parts = line.split()
+            if len(parts) >= 2 and len(parts) <= 4:
+                # Check if first part looks like an emoji (unicode chars)
+                first_part = parts[0]
+                if len(first_part) <= 4 and any(ord(char) > 127 for char in first_part):
+                    # This looks like a valid badge format
+                    result = ' '.join(parts)
+                    break
+        
+        # Final cleanup - remove any remaining formatting
+        result = re.sub(r'[*_`]', '', result)  # Remove markdown chars
+        result = result.strip()
+        
+        # Validate final format (emoji + 2-3 words)
         parts = result.split()
-        if len(parts) >= 3 and len(parts[0]) <= 4:  # Emoji is usually 1-4 chars
-            return result
+        if len(parts) >= 2 and len(parts) <= 4:
+            # Check if first part is likely an emoji
+            if len(parts[0]) <= 4 and any(ord(char) > 127 for char in parts[0]):
+                return ' '.join(parts)
 
     logger.error("Failed to generate pulse badge from AI, using fallback")
 
@@ -777,22 +861,91 @@ def handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, Any]:
 
         if estimated_cost_cents > config["max_cost_cents"]:
             logger.warning(
-                f"Estimated cost {estimated_cost_cents:.2f} cents exceeds limit {config['max_cost_cents']}"
+                f"Estimated cost {estimated_cost_cents:.4f} cents exceeds limit {config['max_cost_cents']}"
             )
             return {**event, "enhanced": False, "reason": "Cost limit exceeded"}
 
-        # Generate AI enhancements
-        enhanced_title = enhance_pulse_title(pulse_values, config)
-        ai_badge = generate_ai_badge(pulse_values, config)
-        ai_insights = generate_ai_insights(pulse_values, config)
-
-        # Record AI usage and trigger rewards
+        # Start tracking the enhancement
         user_id = pulse_values.get("user_id", "unknown")
+        pulse_id = pulse_values.get("pulse_id", "unknown")
+        
+        # Estimate tokens for tracking
+        estimated_input_tokens = text_length // 4  # rough approximation
+        estimated_output_tokens = 400  # estimate for title + badge + insights
+        
+        event_id = tracking_integration.start_enhancement_tracking(
+            user_id=user_id,
+            pulse_id=pulse_id,
+            model_id=config["bedrock_model_id"],
+            estimated_input_tokens=estimated_input_tokens,
+            estimated_output_tokens=estimated_output_tokens,
+            metadata={
+                "enhancement_type": "full",  # title + badge + insights
+                "intent_emotion": pulse_values.get("intent_emotion"),
+                "reflection_emotion": pulse_values.get("reflection_emotion"),
+            }
+        )
+        
+        from datetime import datetime
+        start_time = datetime.now()
+
+        try:
+            # Generate AI enhancements
+            enhanced_title = enhance_pulse_title(pulse_values, config)
+            ai_badge = generate_ai_badge(pulse_values, config)
+            ai_insights = generate_ai_insights(pulse_values, config)
+            
+            # Calculate actual processing time
+            duration_ms = int((datetime.now() - start_time).total_seconds() * 1000)
+            
+            # Complete tracking successfully
+            if event_id and user_id != "unknown":
+                actual_input_tokens = estimated_input_tokens  # Could be more precise with actual token counting
+                actual_output_tokens = len(enhanced_title + ai_badge + str(ai_insights)) // 4
+                
+                actual_cost_cents = tracking_integration.complete_enhancement_tracking(
+                    event_id=event_id,
+                    user_id=user_id,
+                    model_id=config["bedrock_model_id"],
+                    input_tokens=actual_input_tokens,
+                    output_tokens=actual_output_tokens,
+                    duration_ms=duration_ms,
+                    response_metadata={
+                        "title_generated": bool(enhanced_title),
+                        "badge_generated": bool(ai_badge),
+                        "insights_generated": bool(ai_insights),
+                        "enhancement_success": True,
+                    }
+                )
+                
+                # Use actual cost if available, otherwise fall back to estimate
+                if actual_cost_cents is not None:
+                    final_cost_cents = actual_cost_cents
+                else:
+                    final_cost_cents = estimated_cost_cents
+
+        except Exception as enhancement_error:
+            # Track the failure
+            if event_id and user_id != "unknown":
+                tracking_integration.fail_enhancement_tracking(
+                    event_id=event_id,
+                    user_id=user_id,
+                    error_code="ENHANCEMENT_FAILED",
+                    error_message=str(enhancement_error),
+                    duration_ms=int((datetime.now() - start_time).total_seconds() * 1000) if 'start_time' in locals() else None
+                )
+            raise enhancement_error
+
+        # Set default cost if not set from tracking
+        if 'final_cost_cents' not in locals():
+            final_cost_cents = estimated_cost_cents
+
+        # Record AI usage and trigger rewards - use actual cost with full precision
         if user_id != "unknown":
             try:
                 usage_result = budget_service.record_ai_enhancement(
                     user_id,
-                    int(estimated_cost_cents),
+                    final_cost_cents,  # Use actual cost with full precision
                     pulse_data,  # Pass pulse data for reward analysis
                 )
                 logger.info(f"Recorded AI usage for user {user_id}: {usage_result}")
@@ -811,19 +964,19 @@ def handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, Any]:
             "gen_badge": ai_badge,
             "ai_enhanced": True,
             "ai_insights": ai_insights,
-            "ai_cost_cents": estimated_cost_cents,
+            "ai_cost_cents": final_cost_cents,  # Store with 4 decimal precision
         }
 
         result = {
             **event,
             "enhanced": True,
             "enhancedPulse": enhanced_pulse,
-            "aiCost": estimated_cost_cents,
+            "aiCost": final_cost_cents,  # Return with 4 decimal precision
         }
 
         logger.info(
             f"Successfully enhanced pulse {pulse_values['pulse_id']} "
-            f"with title: '{enhanced_title}' (cost: {estimated_cost_cents:.2f}¢)"
+            f"with title: '{enhanced_title}' (cost: {final_cost_cents:.4f}¢)"
         )
 
         return result

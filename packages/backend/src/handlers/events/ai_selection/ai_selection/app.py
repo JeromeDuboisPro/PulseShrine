@@ -21,6 +21,8 @@ try:
         EXCEPTIONAL_THRESHOLD,
         GOOD_THRESHOLD,
     )
+    from shared.ai_tracking.services.tracking_integration import AITrackingIntegration
+    from shared.utils.app_with_tracking import app_with_tracking
 except ImportError:
     # Fallback imports for local testing
     import sys
@@ -35,6 +37,8 @@ except ImportError:
         EXCEPTIONAL_THRESHOLD,
         GOOD_THRESHOLD,
     )
+    from shared.ai_tracking.services.tracking_integration import AITrackingIntegration
+    from shared.utils.app_with_tracking import app_with_tracking
 
 # Initialize the logger
 logger = Logger()
@@ -47,10 +51,13 @@ parameter_cache = {}
 
 # Initialize services (will be lazy-loaded)
 ai_usage_table_name = os.environ.get(
-    "AI_USAGE_TRACKING_TABLE_NAME", "ai-usage-tracking"
+    "AI_USAGE_TRACKING_TABLE_NAME", "ps-ai-usage-tracking"
 )
 budget_service = AIBudgetService(ai_usage_table_name)
 worthiness_calculator = WorthinessCalculator(budget_service)
+
+# Initialize tracking integration
+tracking_integration = AITrackingIntegration(ai_usage_table_name)
 
 
 def get_parameter(parameter_name: str, default_value: str = "0") -> str:
@@ -78,7 +85,7 @@ def get_ai_config() -> Dict[str, float]:
         ),
         "enabled": get_parameter(f"{prefix}enabled", "true").lower() == "true",
         "bedrock_model_id": get_parameter(
-            f"{prefix}bedrock_model_id", "amazon.titan-text-express-v1"
+            f"{prefix}bedrock_model_id", "us.amazon.nova-lite-v1:0"
         ),
     }
 
@@ -140,20 +147,37 @@ def estimate_enhancement_cost(
         intent = str(pulse_data.get("intent", ""))
         reflection = str(pulse_data.get("reflection", ""))
         total_chars = len(intent) + len(reflection)
+        
+        # Frontend enforces max 200 chars each, so total max is 400 chars
+        # Cap at actual maximum possible length
+        total_chars = min(total_chars, 400)
 
-        # Estimate based on token count (rough approximation: 4 chars per token)
-        estimated_tokens = total_chars // 4
+        # Estimate input tokens (rough approximation: 4 chars per token)
+        estimated_input_tokens = max(total_chars // 4, 1)  # Minimum 1 token
+        
+        # For short content (400 chars max), output will be proportionally smaller
+        # Estimate ~150-300 tokens output based on input length
+        estimated_output_tokens = min(50 + (estimated_input_tokens * 2), 300)
 
-        # Nova Lite pricing: ~$0.00006 per 1K tokens input, ~$0.00024 per 1K tokens output
-        # Assume 200 tokens output on average
-        input_cost_cents = (estimated_tokens / 1000) * 0.006  # 0.6 cents per 1K tokens
-        output_cost_cents = (200 / 1000) * 0.024  # 2.4 cents per 1K tokens output
-
-        total_cost_cents = (input_cost_cents + output_cost_cents) * 100 + 0.001  # Add small buffer
+        # Nova Lite pricing: $0.00006 per 1K input tokens, $0.00024 per 1K output tokens
+        input_cost_dollars = (estimated_input_tokens / 1000) * 0.00006
+        output_cost_dollars = (estimated_output_tokens / 1000) * 0.00024
+        
+        total_cost_dollars = input_cost_dollars + output_cost_dollars
+        total_cost_cents = total_cost_dollars * 100  # Convert to cents
+        
+        # Add small buffer for processing overhead
+        total_cost_cents += 0.01
 
         # Cap at configured maximum
         max_cost = float(config.get("max_cost_cents", 2.0))
-        return round(min(total_cost_cents, max_cost), 3)  # Round to 3 decimal places
+        final_cost = min(total_cost_cents, max_cost)
+        
+        logger.debug(
+            f"Cost estimation: {total_chars} chars → {estimated_input_tokens} input + {estimated_output_tokens} output tokens → {final_cost:.4f} cents"
+        )
+        
+        return round(final_cost, 4)  # Round to 4 decimal places for 0.0001 cent precision
 
     except Exception as e:
         logger.warning(f"Error estimating cost: {e}")
@@ -177,6 +201,13 @@ def should_enhance_with_ai(
 
         # Estimate cost for this enhancement
         estimated_cost_cents = estimate_enhancement_cost(pulse_data, config)
+
+        # Debug: Check if user exists in ps-users table
+        try:
+            user_plan = budget_service.user_service.get_user_plan(user_id)
+            logger.info(f"User {user_id} plan: {user_plan}")
+        except Exception as e:
+            logger.error(f"Error getting user plan for debug: {e}")
 
         # Check budget availability
         can_afford, budget_reason, usage_info = budget_service.can_afford_enhancement(
@@ -237,15 +268,29 @@ def should_enhance_with_ai(
             )
             should_enhance = False
 
-        # Record AI enhancement decision and get triggered rewards
-        # Only record enhancement if we're actually going to enhance
+        # Track the selection decision using new tracking service
+        pulse_id = pulse_data.get("pulse_id", "unknown")
+        tracking_integration.track_selection_decision(
+            user_id=user_id,
+            pulse_id=pulse_id,
+            worthiness_score=worthiness_score,
+            decision=decision_reason,
+            ai_worthy=should_enhance,
+            estimated_cost_cents=estimated_cost_cents,
+            metadata={
+                "budget_available": can_afford,
+                "model_id": config.get("bedrock_model_id"),
+            }
+        )
+
+        # Check for rewards without recording enhancement (will be recorded in Bedrock handler)
+        # Only pre-calculate rewards if we're actually going to enhance
         triggered_rewards = []
         if should_enhance:
-            enhancement_result = budget_service.record_ai_enhancement(
-                user_id, estimated_cost_cents, pulse_data
+            # Pre-calculate rewards based on pulse data without incrementing counters
+            triggered_rewards = budget_service._check_rewards_and_achievements(
+                budget_service.get_or_create_daily_usage(user_id), pulse_data
             )
-            # Extract the rewards list from the response
-            triggered_rewards = enhancement_result.get("rewards", [])
 
         logger.info(
             f"AI selection decision for user {user_id}: {decision_reason}, enhance={should_enhance}",
@@ -267,6 +312,7 @@ def should_enhance_with_ai(
                 "estimated_cost_cents": estimated_cost_cents,
                 "usage_info": usage_info,
                 "triggered_rewards": triggered_rewards,
+                "could_be_enhanced": True,  # Budget available, just worthiness decision
             },
         )
 
@@ -276,7 +322,7 @@ def should_enhance_with_ai(
 
 
 @logger.inject_lambda_context
-def handler(event, context: LambdaContext):
+def ai_selection_handler(event, context: LambdaContext):
     """
     Lambda function handler for AI selection using Powertools.
 
@@ -364,3 +410,7 @@ def handler(event, context: LambdaContext):
     except Exception as e:
         logger.exception("Error in AI selection")
         return {"aiWorthy": False, "error": str(e), "originalEvent": event}  # type: ignore
+
+
+# Wrap with tracking
+handler = app_with_tracking(ai_selection_handler, tracking_integration)

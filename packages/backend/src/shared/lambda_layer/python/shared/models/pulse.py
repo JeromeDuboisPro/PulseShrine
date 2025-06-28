@@ -135,9 +135,9 @@ class ArchivedPulse(StopPulse):
     @field_validator('ai_cost_cents')
     @classmethod
     def round_cost_precision(cls, v):
-        """Round cost to 3 decimal places for consistent precision"""
+        """Round cost to 4 decimal places for 0.0001 cent precision"""
         if v is not None:
-            return round(float(v), 3)
+            return round(float(v), 4)
         return v
     ai_insights: Optional[dict] = Field(
         default=None,
@@ -150,6 +150,10 @@ class ArchivedPulse(StopPulse):
     selection_info: Optional[dict] = Field(
         default=None,
         description="Information about AI selection decision",
+    )
+    ai_selection_info: Optional[dict] = Field(
+        default=None,
+        description="Detailed AI selection decision information for user transparency",
     )
 
     @computed_field

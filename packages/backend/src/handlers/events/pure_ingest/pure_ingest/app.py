@@ -7,6 +7,7 @@ from typing import Dict, Any, Union, Optional
 
 from shared.models.pulse import StopPulse, ArchivedPulse
 from shared.services.aws import get_ddb_table
+from shared.services.user_service import UserService
 from botocore.exceptions import BotoCoreError, ClientError
 
 # Initialize the logger
@@ -15,6 +16,9 @@ logger = Logger()
 # Environment variables
 STOP_PULSE_TABLE_NAME = os.environ["STOP_PULSE_TABLE_NAME"]
 INGESTED_PULSE_TABLE_NAME = os.environ["INGESTED_PULSE_TABLE_NAME"]
+
+# Initialize user service for stats tracking
+user_service = UserService()
 
 
 def convert_floats_to_decimal(obj):
@@ -118,7 +122,19 @@ def handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, Any]:
                 archived_pulse_data["triggered_rewards"] = []
             
         if selection_info:
-            archived_pulse_data["selection_info"] = selection_info
+            # Store comprehensive AI selection decision information for user transparency
+            archived_pulse_data["ai_selection_info"] = {
+                "decision_reason": selection_info.get("decision_reason", "Unknown"),
+                "worthiness_score": selection_info.get("worthiness_score", 0.0),
+                "estimated_cost_cents": selection_info.get("estimated_cost_cents", 0.0),
+                "could_be_enhanced": selection_info.get("could_be_enhanced", False),
+                "budget_status": {
+                    "daily_used": selection_info.get("usage_info", {}).get("daily_cost_cents", 0),
+                    "monthly_used": selection_info.get("usage_info", {}).get("monthly_cost_cents", 0),
+                    "user_tier": selection_info.get("usage_info", {}).get("user_tier", "free"),
+                },
+                "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            }
 
         archived_pulse = ArchivedPulse(**archived_pulse_data)  # type: ignore
 
@@ -128,6 +144,20 @@ def handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, Any]:
         if success:
             # Archive/delete from stop pulse table
             archive_success = archive_stop_pulse(pulse_id, STOP_PULSE_TABLE_NAME)  # type: ignore
+
+            # Update user stats - increment pulse count and AI enhancement count if applicable
+            try:
+                user_id = stop_pulse.user_id
+                ai_increment = 1 if ai_enhanced else 0
+                stats_updated = user_service.update_user_stats(
+                    user_id, 
+                    pulse_increment=1, 
+                    ai_enhancement_increment=ai_increment
+                )
+                logger.info(f"Updated user stats for {user_id}: pulse +1, AI +{ai_increment}, success: {stats_updated}")
+            except Exception as e:
+                logger.warning(f"Failed to update user stats for pulse {pulse_id}: {e}")
+                # Don't fail the ingestion if stats update fails
 
             logger.info(
                 f"Successfully ingested pulse {pulse_id}",

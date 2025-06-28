@@ -159,13 +159,15 @@ class WorthinessCalculator:
         # Extract key data
         intent = pulse_data.get("intent", "")
         reflection = pulse_data.get("reflection", "")
-        duration_seconds = pulse_data.get("duration_seconds", 0)
         intent_emotion = pulse_data.get("intent_emotion", "")
         reflection_emotion = pulse_data.get("reflection_emotion", "")
+        
+        # Calculate actual duration from start_time and stopped_at (real elapsed time)
+        actual_duration_seconds = self._calculate_actual_duration(pulse_data)
 
         # Calculate component scores
         length_score = self._calculate_length_score(intent, reflection)
-        duration_score = self._calculate_duration_score(duration_seconds)
+        duration_score = self._calculate_duration_score(actual_duration_seconds)
         depth_score = self._calculate_reflection_depth(
             intent, reflection, intent_emotion, reflection_emotion
         )
@@ -181,44 +183,88 @@ class WorthinessCalculator:
 
         logger.info(
             f"Worthiness calculation for user {user_id}: "
-            f"length={length_score:.3f}, duration={duration_score:.3f}, "
+            f"length={length_score:.3f}, duration={duration_score:.3f} ({actual_duration_seconds}s), "
             f"depth={depth_score:.3f}, frequency={frequency_score:.3f}, "
             f"total={worthiness:.3f}"
         )
 
         return min(1.0, worthiness)  # Cap at 1.0
 
+    def _calculate_actual_duration(self, pulse_data: Dict[str, Any]) -> int:
+        """Calculate actual elapsed time from start_time to stopped_at"""
+        try:
+            start_time = pulse_data.get("start_time")
+            stopped_at = pulse_data.get("stopped_at")
+            
+            # If we don't have both times, fall back to duration_seconds setting
+            if not start_time or not stopped_at:
+                logger.warning("Missing start_time or stopped_at, using duration_seconds fallback")
+                return pulse_data.get("duration_seconds", 0)
+            
+            # Parse times (handle both string and datetime objects)
+            from datetime import datetime, timezone
+            
+            if isinstance(start_time, str):
+                start_dt = datetime.fromisoformat(start_time)
+            else:
+                start_dt = start_time
+                
+            if isinstance(stopped_at, str):
+                stop_dt = datetime.fromisoformat(stopped_at)
+            else:
+                stop_dt = stopped_at
+            
+            # Ensure timezone-aware
+            if start_dt.tzinfo is None:
+                start_dt = start_dt.replace(tzinfo=timezone.utc)
+            if stop_dt.tzinfo is None:
+                stop_dt = stop_dt.replace(tzinfo=timezone.utc)
+            
+            # Calculate actual elapsed time
+            actual_duration = int((stop_dt - start_dt).total_seconds())
+            
+            # Cap at planned duration (user can't exceed original plan)
+            planned_duration = pulse_data.get("duration_seconds", actual_duration)
+            return min(actual_duration, planned_duration)
+            
+        except Exception as e:
+            logger.warning(f"Error calculating actual duration: {e}, using duration_seconds fallback")
+            return pulse_data.get("duration_seconds", 0)
+
     def _calculate_length_score(self, intent: str, reflection: str) -> float:
         """Calculate score based on content length (indicates user effort)"""
         total_chars = len(intent) + len(reflection)
-
-        # Progressive scoring
-        if total_chars >= 500:  # 500+ chars = max score (significant effort)
+        
+        # Frontend enforces max 200 chars each (total 400 chars max)
+        # Adjust scoring for realistic content lengths
+        if total_chars >= 350:  # 350-400 chars = max score (near-maximum effort)
             return 1.0
-        elif total_chars >= 300:  # 300-499 chars = high score
-            return 0.8 + (total_chars - 300) / 200 * 0.2
-        elif total_chars >= 150:  # 150-299 chars = medium score
-            return 0.5 + (total_chars - 150) / 150 * 0.3
-        elif total_chars >= 50:  # 50-149 chars = low score
+        elif total_chars >= 250:  # 250-349 chars = high score  
+            return 0.8 + (total_chars - 250) / 100 * 0.2
+        elif total_chars >= 150:  # 150-249 chars = medium score
+            return 0.5 + (total_chars - 150) / 100 * 0.3
+        elif total_chars >= 50:   # 50-149 chars = low score
             return 0.2 + (total_chars - 50) / 100 * 0.3
         else:  # <50 chars = minimal score
             return total_chars / 50 * 0.2
 
     def _calculate_duration_score(self, duration_seconds: int) -> float:
         """Calculate score based on session duration (indicates dedication)"""
-        duration_hours = float(duration_seconds) / 3600
+        duration_minutes = float(duration_seconds) / 60
 
-        # Progressive scoring
-        if duration_hours >= 2.0:  # 2+ hours = max score (deep work)
+        # Progressive scoring based on Pomodoro patterns (median ~25 minutes)
+        if duration_minutes >= 90:  # 90+ minutes = max score (exceptional deep work)
             return 1.0
-        elif duration_hours >= 1.0:  # 1-2 hours = high score
-            return 0.7 + (duration_hours - 1.0) * 0.3
-        elif duration_hours >= 0.5:  # 30min-1hr = medium score
-            return 0.4 + (duration_hours - 0.5) * 0.6
-        elif duration_hours >= 0.25:  # 15-30min = low score
-            return 0.2 + (duration_hours - 0.25) * 0.8
-        else:  # <15min = minimal score
-            return duration_hours / 0.25 * 0.2
+        elif duration_minutes >= 60:  # 60-90 minutes = high score (extended focus)
+            return 0.8 + (duration_minutes - 60) / 30 * 0.2
+        elif duration_minutes >= 30:  # 30-60 minutes = medium-high score (good focus)
+            return 0.6 + (duration_minutes - 30) / 30 * 0.2
+        elif duration_minutes >= 20:  # 20-30 minutes = medium score (around median)
+            return 0.4 + (duration_minutes - 20) / 10 * 0.2
+        elif duration_minutes >= 10:  # 10-20 minutes = low score (minimal effort)
+            return 0.2 + (duration_minutes - 10) / 10 * 0.2
+        else:  # <10 minutes = very low score (barely started)
+            return duration_minutes / 10 * 0.2
 
     def _calculate_reflection_depth(
         self, intent: str, reflection: str, intent_emotion: str, reflection_emotion: str

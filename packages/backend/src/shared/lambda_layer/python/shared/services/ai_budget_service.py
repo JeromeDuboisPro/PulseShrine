@@ -6,27 +6,30 @@ Handles daily/monthly budget tracking, AI credits, and gamification rewards.
 
 import boto3
 from datetime import datetime, timezone, timedelta
-from typing import Dict, Any, Tuple, List
+from typing import Dict, Any, Tuple, List, Optional
+from decimal import Decimal
 from aws_lambda_powertools import Logger
+
+from .user_service import UserService
 
 logger = Logger()
 
-# Budget tiers configuration
+# Budget tiers configuration - Updated pricing strategy
 BUDGET_TIERS = {
     "free": {
-        "daily_base_cents": 10,  # 10 cents base daily budget
-        "daily_bonus_credits": 5,  # 5 cents in bonus credits
-        "monthly_cap_cents": 50,  # 50 cents monthly cap
+        "daily_base_cents": 5,   # 5¢ daily (≈2-5 AI enhancements)
+        "daily_bonus_credits": 0,  # No bonus credits for free tier
+        "monthly_cap_cents": 30,   # 30¢ monthly cap - hook users with AI taste
     },
     "premium": {
-        "daily_base_cents": 40,  # 40 cents base
-        "daily_bonus_credits": 10,  # 10 cents bonus
-        "monthly_cap_cents": 250,  # $2.50 monthly cap
+        "daily_base_cents": 18,    # 18¢ daily (≈7-20 AI enhancements)
+        "daily_bonus_credits": 2,  # 2¢ bonus credits
+        "monthly_cap_cents": 375,  # $3.75 monthly cap (75% of $5 revenue)
     },
     "unlimited": {
-        "daily_base_cents": 400,  # $4 base
-        "daily_bonus_credits": 100,  # $1 bonus
-        "monthly_cap_cents": 500,  # $5 monthly cap
+        "daily_base_cents": 75,    # 75¢ daily (≈25-100 AI enhancements)
+        "daily_bonus_credits": 25, # 25¢ bonus credits ($1.00 total daily)
+        "monthly_cap_cents": 1000, # $10.00 monthly cap (50% of $20 revenue)
     },
 }
 
@@ -78,8 +81,9 @@ ACHIEVEMENTS = {
 
 
 class AIBudgetService:
-    def __init__(self, table_name: str):
+    def __init__(self, table_name: str, user_service: Optional[UserService] = None):
         self.table_name = table_name
+        self.user_service = user_service or UserService()
         self._dynamodb = None
         self._table = None
 
@@ -107,9 +111,11 @@ class AIBudgetService:
 
     def get_user_tier(self, user_id: str) -> str:
         """Get user's tier (free/premium/unlimited)"""
-        # For now, everyone is free tier for the contest
-        # TODO: Implement user tier lookup from user service
-        return "free"
+        try:
+            return self.user_service.get_user_plan(user_id)
+        except Exception as e:
+            logger.error(f"Error getting user tier for {user_id}: {e}")
+            return "free"  # Safe fallback
 
     def get_or_create_daily_usage(
         self, user_id: str, date: str = None
@@ -119,7 +125,7 @@ class AIBudgetService:
             date = self.get_today_date()
 
         try:
-            response = self.table.get_item(Key={"user_id": user_id, "date": date})
+            response = self.table.get_item(Key={"PK": f"USER#{user_id}", "SK": f"DAILY#{date}"})
 
             if "Item" in response:
                 # Convert Decimals to floats/ints for easier handling
@@ -164,7 +170,13 @@ class AIBudgetService:
                     ),  # 90 day retention
                 }
 
-                self.table.put_item(Item=new_record)
+                # Convert to new table format
+                new_record_item = {
+                    "PK": f"USER#{user_id}",
+                    "SK": f"DAILY#{date}",
+                    **new_record
+                }
+                self.table.put_item(Item=new_record_item)
                 return new_record
 
         except Exception as e:
@@ -259,9 +271,9 @@ class AIBudgetService:
             """
 
             expression_values = {
-                ":daily_cost": new_daily_cost,
+                ":daily_cost": Decimal(str(new_daily_cost)),
                 ":daily_enhanced": new_daily_enhanced,
-                ":monthly_cost": new_monthly_cost,
+                ":monthly_cost": Decimal(str(new_monthly_cost)),
                 ":daily_credits": new_credits,
                 ":total_enhanced": new_total_enhanced,
                 ":month": month,
@@ -285,7 +297,7 @@ class AIBudgetService:
                 expression_values[":achievements"] = new_achievements
 
             self.table.update_item(
-                Key={"user_id": user_id, "date": date},
+                Key={"PK": f"USER#{user_id}", "SK": f"DAILY#{date}"},
                 UpdateExpression=update_expression,
                 ExpressionAttributeValues=expression_values,
                 ExpressionAttributeNames=expression_names,

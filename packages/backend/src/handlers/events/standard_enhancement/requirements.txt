@@ -1,7 +1,5 @@
-aws-lambda-powertools[parser]
-aws_xray_sdk
-boto3
-pydantic
+# AWS Lambda Powertools, X-Ray SDK, boto3, and pydantic provided by layers
+# Only additional dependencies needed:
 textblob
 emoji
 fuzzywuzzy

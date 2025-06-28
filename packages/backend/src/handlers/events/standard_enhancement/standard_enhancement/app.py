@@ -54,7 +54,7 @@ def handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, Any]:
             "generatedTitle": generated_title,
             "generatedBadge": generated_badge,
             "aiEnhanced": False,  # This is standard generation
-            "stopPulse": stop_pulse.model_dump(),
+            "stopPulse": stop_pulse.model_dump(mode='json'),  # Serialize datetime objects properly
         }
 
         return result
