@@ -1,5 +1,5 @@
+import React, { useEffect, useRef, useState } from 'react';
 import { Heart, Moon, Mountain, Play, Sparkles, Target, Zap, Settings, Star, Brain, Award, CreditCard, AlertCircle } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
 import { ApiError, IngestedPulse, PulseAPI, StartPulse, StopPulse } from '../api';
 import { ApiConfig, updateConfig } from '../config';
 import { ConfigurationModal } from './ConfigurationModal';
@@ -18,7 +18,6 @@ export const PulseApp: React.FC<PulseAppProps> = ({ config, onReconfigure }) => 
   const [clientTimerActive, setClientTimerActive] = useState(false); // Track if we're in pure client timer mode
   const [timerEndTime, setTimerEndTime] = useState<number | null>(null); // Absolute end time for client timer
   const [timerInitialized, setTimerInitialized] = useState(false); // Track if timer was ever started
-  const [isPulsePaused, setIsPulsePaused] = useState(false); // Track if pulse was paused early
   const [completedPulses, setCompletedPulses] = useState<IngestedPulse[]>([]);
   const [stoppedPulses, setStoppedPulses] = useState<StopPulse[]>([]);
   const [intention, setIntention] = useState('');
@@ -36,7 +35,6 @@ export const PulseApp: React.FC<PulseAppProps> = ({ config, onReconfigure }) => 
   const userIdRef = useRef(config.userId);
   const loadPulsesRef = useRef<(() => Promise<void>) | null>(null);
   const stableTimeLeftRef = useRef(0); // Stable reference to prevent flicker
-  const isPulsePausedRef = useRef(false); // Immediate reference for paused state
 
   // Helper to detect connection/API issues
   const isConnectionError = (errorMessage: string | null): boolean => {
@@ -96,9 +94,9 @@ export const PulseApp: React.FC<PulseAppProps> = ({ config, onReconfigure }) => 
         });
         
         recentPulses.forEach(pulse => {
-          if (pulse.selection_info?.could_be_enhanced && !pulse.ai_enhanced) {
+          if (pulse.ai_selection_info?.could_be_enhanced && !pulse.ai_enhanced) {
             setPlanNotification({
-              message: `This ${pulse.selection_info.worthiness_score >= 0.8 ? 'exceptional' : 'high-quality'} pulse could have been AI-enhanced!`,
+              message: `This ${pulse.ai_selection_info.worthiness_score >= 0.8 ? 'exceptional' : 'high-quality'} pulse could have been AI-enhanced!`,
               type: 'upgrade',
               pulse
             });
@@ -122,9 +120,8 @@ export const PulseApp: React.FC<PulseAppProps> = ({ config, onReconfigure }) => 
           setDuration(Math.ceil(started.duration_seconds / 60)); // Convert back to minutes for UI
           
           
-          // Only initialize timer if not already running AND not paused AND not initialized
-          // Check both state and ref to handle timing issues
-          if (!clientTimerActive && !timerInitialized && !isPulsePaused && !isPulsePausedRef.current) {
+          // Only initialize timer if not already running AND not initialized
+          if (!clientTimerActive && !timerInitialized) {
             const serverRemaining = started.remaining_seconds !== undefined 
               ? started.remaining_seconds 
               : started.duration_seconds;
@@ -151,29 +148,17 @@ export const PulseApp: React.FC<PulseAppProps> = ({ config, onReconfigure }) => 
               setTimerInitialized(false);
               setCurrentView('emotion');
             }
-          } else if (isPulsePaused || isPulsePausedRef.current) {
-            console.log('POLLING UPDATE - Pulse is paused, preserving paused state and current timeLeft');
-            // Update timeLeft only if it's not already set correctly, but don't restart timer
-            const serverRemaining = started.remaining_seconds !== undefined 
-              ? started.remaining_seconds 
-              : started.duration_seconds;
-            if (timeLeft !== serverRemaining) {
-              setTimeLeft(serverRemaining);
-              stableTimeLeftRef.current = serverRemaining;
-            }
           } else {
             console.log('POLLING UPDATE - Timer already active, no initialization needed');
           }
         } else {
           // No active pulse on server, clear local state if needed
-          if (activePulse && !isPulsePaused) {
+          if (activePulse) {
             console.log('Server reports no active pulse, clearing local state');
             setActivePulse(null);
             setIsRunning(false);
             setClientTimerActive(false);
             setTimerInitialized(false);
-          } else if (isPulsePaused) {
-            console.log('POLLING UPDATE - Pulse paused locally, keeping state despite server having no active pulse');
           }
         }
         
@@ -220,12 +205,6 @@ export const PulseApp: React.FC<PulseAppProps> = ({ config, onReconfigure }) => 
         const now = Date.now();
         const remaining = Math.max(0, Math.floor((timerEndTime - now) / 1000));
         
-        console.log('Timer tick:', {
-          remaining,
-          now: new Date(now).toISOString(),
-          endTime: new Date(timerEndTime).toISOString(),
-          secondsLeft: remaining
-        });
         
         setTimeLeft(remaining);
         stableTimeLeftRef.current = remaining; // Keep ref in sync
@@ -235,8 +214,6 @@ export const PulseApp: React.FC<PulseAppProps> = ({ config, onReconfigure }) => 
           setClientTimerActive(false);
           setTimerEndTime(null);
           setTimerInitialized(false); // Allow future timers to auto-resume
-          setIsPulsePaused(false); // Clear paused state - timer naturally completed
-          isPulsePausedRef.current = false; // Clear ref as well
           setCurrentView('emotion');
         }
       }, 1000);
@@ -300,29 +277,6 @@ export const PulseApp: React.FC<PulseAppProps> = ({ config, onReconfigure }) => 
   };
 
 
-  const stopPulse = () => {
-    console.log('Stopping pulse early - pausing timer');
-    setIsRunning(false);
-    setIsPulsePaused(true); // Mark as paused, not completed
-    isPulsePausedRef.current = true; // Immediate ref update to handle timing
-    // Keep clientTimerActive and timerEndTime and timerInitialized so we can resume
-    // DON'T reset clientTimerActive, timerEndTime, or timerInitialized
-    setCurrentView('emotion');
-  };
-
-  const resumePulse = () => {
-    console.log('Resuming paused pulse');
-    setIsPulsePaused(false);
-    isPulsePausedRef.current = false; // Clear ref as well
-    setIsRunning(true);
-    
-    // Calculate new end time based on current remaining time
-    const newEndTime = Date.now() + (timeLeft * 1000);
-    setTimerEndTime(newEndTime);
-    console.log('Resume: Setting new end time based on current timeLeft:', { timeLeft, newEndTime: new Date(newEndTime).toISOString() });
-    
-    setCurrentView('timer');
-  };
 
 
   const submitEmotion = async (emotion: string, reflection = '') => {
@@ -340,8 +294,6 @@ export const PulseApp: React.FC<PulseAppProps> = ({ config, onReconfigure }) => 
       setSelectedEnergy('creation');
       setDuration(25);
       setCurrentView('shrine');
-      setIsPulsePaused(false); // Clear paused state
-      isPulsePausedRef.current = false; // Clear ref as well
       setClientTimerActive(false); // Release control back to server
       setTimerEndTime(null); // Clear the end time
       setTimerInitialized(false); // Allow future timers to auto-resume
@@ -492,7 +444,23 @@ export const PulseApp: React.FC<PulseAppProps> = ({ config, onReconfigure }) => 
             <div className="flex items-center justify-between mb-4">
               <div className="flex-1"></div>
               <div className="flex items-center space-x-3">
-                <PulseShrineLogoSvg size={72} className="drop-shadow-lg transition-transform duration-300 hover:scale-110 cursor-pointer" />
+                <div className="relative group">
+                  <div className="absolute inset-0 bg-gradient-to-r from-purple-400 to-blue-400 rounded-full opacity-10 blur-sm animate-zen-breathe"></div>
+                  <PulseShrineLogoSvg size={72} className="relative transition-transform duration-300 hover:scale-110 cursor-pointer" />
+                  <div className="absolute top-full mt-3 left-1/2 transform -translate-x-1/2 bg-slate-800/90 backdrop-blur-sm text-white px-4 py-3 rounded-lg text-sm opacity-0 group-hover:opacity-100 transition-all duration-300 z-50 w-80 shadow-lg pointer-events-none">
+                    <div className="font-medium text-slate-100 flex items-center justify-center space-x-2">
+                      <span>🧘</span>
+                      <span>Follow the rhythm, find your calm</span>
+                      <span>🧘</span>
+                    </div>
+                    <div className="text-slate-300 mt-1 flex items-center justify-center space-x-2">
+                      <span>💙</span>
+                      <span>Breathe with the pulse to unlock the stress-reducing power of cardiac coherence</span>
+                      <span>💙</span>
+                    </div>
+                    <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-slate-800/90"></div>
+                  </div>
+                </div>
                 <h1 className="text-4xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
                   Pulse Shrine
                 </h1>
@@ -527,12 +495,6 @@ export const PulseApp: React.FC<PulseAppProps> = ({ config, onReconfigure }) => 
               </div>
             ) : null}
             
-            {/* Wisdom message - always show when no connection issues */}
-            <div className="text-xs text-gray-500 mt-3 flex items-center justify-center space-x-1 italic">
-              <span className="animate-pulse">🕊️</span>
-              <span>The digital space promotes mindful focus</span>
-              <span className="animate-pulse">🕊️</span>
-            </div>
           </header>
 
           {error && <ErrorMessage message={error} onClose={() => setError(null)} />}
@@ -547,17 +509,18 @@ export const PulseApp: React.FC<PulseAppProps> = ({ config, onReconfigure }) => 
             Welcome to your zen garden. Here, your completed pulses transform into mindful stones that enhance the tranquility of this space. Each intention you fulfill adds to the focused energy of your practice.
           </GuardianMessage>
 
-          <div className="relative bg-gradient-to-br from-slate-100 via-green-50 to-blue-50 rounded-xl p-8 mb-8 border border-slate-200">
+          <div className="relative bg-gradient-to-br from-slate-100 via-green-100 to-blue-50 rounded-xl p-8 mb-8 border border-slate-200">
             {/* Zen Garden Background */}
             <div className="absolute inset-0 opacity-20">
               <svg className="w-full h-full" viewBox="0 0 800 400" fill="none">
-                {/* Water pond */}
-                <ellipse cx="600" cy="280" rx="120" ry="60" fill="#4A90E2" opacity="0.3"/>
-                <ellipse cx="600" cy="280" rx="100" ry="50" fill="#6BA3F0" opacity="0.2"/>
+                {/* Water pond - twice bigger */}
+                <ellipse cx="600" cy="280" rx="300" ry="160" fill="#4A90E2" opacity="0.3"/>
+                <ellipse cx="600" cy="280" rx="260" ry="140" fill="#6BA3F0" opacity="0.2"/>
                 
                 {/* Ripples */}
-                <ellipse cx="580" cy="270" rx="8" ry="4" fill="none" stroke="#4A90E2" strokeWidth="1" opacity="0.4"/>
-                <ellipse cx="620" cy="290" rx="12" ry="6" fill="none" stroke="#4A90E2" strokeWidth="1" opacity="0.3"/>
+                <ellipse cx="540" cy="240" rx="20" ry="12" fill="none" stroke="#4A90E2" strokeWidth="1" opacity="0.4"/>
+                <ellipse cx="660" cy="320" rx="30" ry="16" fill="none" stroke="#4A90E2" strokeWidth="1" opacity="0.3"/>
+                <ellipse cx="600" cy="280" rx="40" ry="24" fill="none" stroke="#4A90E2" strokeWidth="1" opacity="0.2"/>
                 
                 {/* Stepping stones */}
                 <circle cx="150" cy="320" r="25" fill="#8B7355" opacity="0.3"/>
@@ -568,10 +531,50 @@ export const PulseApp: React.FC<PulseAppProps> = ({ config, onReconfigure }) => 
                 <ellipse cx="100" cy="200" rx="40" ry="25" fill="#A8A8A8" opacity="0.4"/>
                 <ellipse cx="750" cy="150" rx="35" ry="20" fill="#B8B8B8" opacity="0.3"/>
                 
-                {/* Bamboo silhouettes */}
+                {/* Bamboo forests - small groups scattered around */}
+                {/* Left side forest cluster 1 */}
                 <rect x="50" y="50" width="8" height="150" fill="#4A7C59" opacity="0.3"/>
                 <rect x="65" y="40" width="6" height="140" fill="#5A8C69" opacity="0.3"/>
                 <rect x="78" y="60" width="7" height="130" fill="#4A7C59" opacity="0.3"/>
+                <rect x="90" y="45" width="5" height="135" fill="#4A7C59" opacity="0.25"/>
+                <rect x="100" y="55" width="7" height="125" fill="#5A8C69" opacity="0.3"/>
+                <rect x="112" y="35" width="6" height="145" fill="#4A7C59" opacity="0.25"/>
+                
+                {/* Left side forest cluster 2 */}
+                <rect x="20" y="120" width="6" height="110" fill="#4A7C59" opacity="0.25"/>
+                <rect x="30" y="105" width="8" height="125" fill="#5A8C69" opacity="0.3"/>
+                <rect x="45" y="115" width="5" height="115" fill="#4A7C59" opacity="0.25"/>
+                
+                {/* Center-left cluster */}
+                <rect x="180" y="70" width="7" height="120" fill="#4A7C59" opacity="0.25"/>
+                <rect x="195" y="85" width="6" height="105" fill="#5A8C69" opacity="0.25"/>
+                <rect x="208" y="75" width="5" height="115" fill="#4A7C59" opacity="0.2"/>
+                
+                {/* Center-right cluster */}
+                <rect x="750" y="60" width="6" height="130" fill="#4A7C59" opacity="0.25"/>
+                <rect x="765" y="45" width="8" height="145" fill="#5A8C69" opacity="0.3"/>
+                <rect x="778" y="55" width="5" height="135" fill="#4A7C59" opacity="0.25"/>
+                
+                {/* Right side forest cluster 1 */}
+                <rect x="680" y="30" width="8" height="160" fill="#4A7C59" opacity="0.3"/>
+                <rect x="695" y="45" width="6" height="140" fill="#5A8C69" opacity="0.3"/>
+                <rect x="708" y="25" width="7" height="155" fill="#4A7C59" opacity="0.25"/>
+                <rect x="720" y="40" width="5" height="145" fill="#5A8C69" opacity="0.25"/>
+                <rect x="732" y="35" width="6" height="150" fill="#4A7C59" opacity="0.3"/>
+                
+                {/* Right side forest cluster 2 */}
+                <rect x="750" y="120" width="7" height="100" fill="#4A7C59" opacity="0.25"/>
+                <rect x="765" y="110" width="5" height="110" fill="#5A8C69" opacity="0.25"/>
+                <rect x="775" y="125" width="6" height="95" fill="#4A7C59" opacity="0.2"/>
+                
+                {/* Back center clusters */}
+                <rect x="350" y="40" width="5" height="80" fill="#4A7C59" opacity="0.15"/>
+                <rect x="360" y="35" width="6" height="85" fill="#5A8C69" opacity="0.15"/>
+                <rect x="370" y="45" width="4" height="75" fill="#4A7C59" opacity="0.15"/>
+                
+                <rect x="450" y="50" width="6" height="90" fill="#4A7C59" opacity="0.15"/>
+                <rect x="462" y="45" width="5" height="95" fill="#5A8C69" opacity="0.15"/>
+                <rect x="472" y="55" width="7" height="85" fill="#4A7C59" opacity="0.15"/>
                 
                 {/* Subtle wave patterns */}
                 <path d="M0,350 Q100,340 200,350 T400,350" stroke="#4A90E2" strokeWidth="2" fill="none" opacity="0.2"/>
@@ -650,7 +653,12 @@ export const PulseApp: React.FC<PulseAppProps> = ({ config, onReconfigure }) => 
                             isProcessing ? 'bg-yellow-800/90' : isAiEnhanced ? 'bg-purple-800/90' : 'bg-slate-800/90'
                           }`}>
                             <div className="font-medium text-slate-100">
-                              {isProcessing ? '⚡ ' : isAiEnhanced ? '🧠 ' : ''}{pulse.gen_title || pulse.intent}
+                              {pulse.gen_badge && (
+                                <div className="mb-1">
+                                  {pulse.gen_badge.length > 45 ? `${pulse.gen_badge.slice(0, 45)}...` : pulse.gen_badge}
+                                </div>
+                              )}
+                              {pulse.gen_title || pulse.intent}
                             </div>
                             {pulse.reflection && (
                               <div className="text-slate-300 mt-1 italic">"{pulse.reflection}"</div>
@@ -660,7 +668,22 @@ export const PulseApp: React.FC<PulseAppProps> = ({ config, onReconfigure }) => 
                             )}
                             {isAiEnhanced && pulse.ai_insights?.productivity_score && (
                               <div className="text-purple-300 mt-1 text-xs">
-                                🌟 Realization: {pulse.ai_insights.productivity_score}/10
+                                🌟 Focus: {pulse.ai_insights.productivity_score}/10
+                              </div>
+                            )}
+                            {pulse.ai_insights && (
+                              <div className="text-slate-400 mt-2 text-xs border-t border-slate-600 pt-2">
+                                <div className="space-y-1">
+                                  {pulse.ai_insights.key_insight && (
+                                    <div><span className="text-slate-300">💡 Insight:</span> {pulse.ai_insights.key_insight}</div>
+                                  )}
+                                  {pulse.ai_insights.next_suggestion && (
+                                    <div><span className="text-slate-300">🎯 Next:</span> {pulse.ai_insights.next_suggestion}</div>
+                                  )}
+                                  {pulse.ai_insights.mood_assessment && (
+                                    <div><span className="text-slate-300">🧘 Mood:</span> {pulse.ai_insights.mood_assessment}</div>
+                                  )}
+                                </div>
                               </div>
                             )}
                             <div className={`absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent ${
@@ -673,13 +696,6 @@ export const PulseApp: React.FC<PulseAppProps> = ({ config, onReconfigure }) => 
                   })}
                 </div>
                 
-                {/* Koi fish swimming animation */}
-                <div className="absolute bottom-4 right-8 opacity-30 z-10">
-                  <div className="text-2xl animate-pulse" style={{animationDuration: '3s'}}>🐟</div>
-                </div>
-                <div className="absolute bottom-8 right-16 opacity-20 z-10">
-                  <div className="text-xl animate-pulse" style={{animationDuration: '4s', animationDelay: '1s'}}>🐠</div>
-                </div>
               </div>
             )}
           </div>
@@ -687,19 +703,11 @@ export const PulseApp: React.FC<PulseAppProps> = ({ config, onReconfigure }) => 
           <div className="bg-white/70 backdrop-blur-sm rounded-xl p-6 border border-white/50">
             {activePulse ? (
               <div className="space-y-4">
-                <div className={`p-4 rounded-lg border ${
-                  isPulsePaused 
-                    ? 'bg-gradient-to-r from-orange-50 to-red-50 border-orange-200' 
-                    : 'bg-gradient-to-r from-yellow-50 to-orange-50 border-yellow-200'
-                }`}>
+                <div className="p-4 rounded-lg border bg-gradient-to-r from-yellow-50 to-orange-50 border-yellow-200">
                   <div className="flex items-center space-x-3 mb-3">
-                    <div className={`w-3 h-3 rounded-full ${
-                      isPulsePaused 
-                        ? 'bg-orange-500' 
-                        : 'bg-green-500 animate-pulse'
-                    }`}></div>
+                    <div className="w-3 h-3 rounded-full bg-green-500 animate-pulse"></div>
                     <span className="font-semibold text-gray-800">
-                      {isPulsePaused ? 'Pulse Paused' : 'Active Pulse in Progress'}
+                      Active Pulse in Progress
                     </span>
                   </div>
                   <p className="text-gray-700 font-medium">"{activePulse.intent}"</p>
@@ -747,8 +755,8 @@ export const PulseApp: React.FC<PulseAppProps> = ({ config, onReconfigure }) => 
                   }}
                   className="w-full bg-gradient-to-r from-green-500 to-emerald-500 text-white py-4 px-6 rounded-lg font-semibold hover:from-green-600 hover:to-emerald-600 transition-all duration-300 flex items-center justify-center space-x-2"
                 >
-                  {isPulsePaused ? <Play className="w-5 h-5" /> : <Target className="w-5 h-5" />}
-                  <span>{isPulsePaused ? 'Resume Pulse' : 'Continue Active Pulse'}</span>
+                  <Target className="w-5 h-5" />
+                  <span>Continue Active Pulse</span>
                 </button>
               </div>
             ) : (
@@ -786,7 +794,7 @@ export const PulseApp: React.FC<PulseAppProps> = ({ config, onReconfigure }) => 
                         return recentPulses.length + (activePulse ? 1 : 0);
                       })()}
                     </div>
-                    <div className="text-xs text-gray-600">Recent</div>
+                    <div className="text-xs text-gray-600">Today</div>
                   </div>
                   
                   {/* AI Enhanced */}
@@ -813,14 +821,14 @@ export const PulseApp: React.FC<PulseAppProps> = ({ config, onReconfigure }) => 
                             )}
                           </span>
                         </div>
-                        <div className="text-xs text-gray-600">Realizations</div>
+                        <div className="text-xs text-gray-600">Focus</div>
                       </>
                     ) : (
                       <>
                         <div className="text-2xl font-bold text-gray-300 h-8 flex items-center justify-center">
                           <Star className="w-6 h-6" />
                         </div>
-                        <div className="text-xs text-gray-400">Realizations</div>
+                        <div className="text-xs text-gray-400">Focus</div>
                       </>
                     )}
                   </div>
@@ -893,13 +901,13 @@ export const PulseApp: React.FC<PulseAppProps> = ({ config, onReconfigure }) => 
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Your Intention
               </label>
-              <input
-                type="text"
+              <textarea
                 value={intention}
                 onChange={(e) => setIntention(e.target.value.slice(0, 200))}
-                placeholder="✨ I will create, learn, or achieve something meaningful... (e.g., 'Write the first chapter of my novel' or 'Master React hooks through hands-on practice')"
+                placeholder="✨ Write my first blog post or learn React hooks"
                 maxLength={200}
-                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none"
+                rows={3}
               />
               <div className="text-xs text-gray-500 mt-1 text-right">
                 {intention.length}/200 characters
@@ -911,37 +919,76 @@ export const PulseApp: React.FC<PulseAppProps> = ({ config, onReconfigure }) => 
                 Choose Your Energy
               </label>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                {Object.entries(energyIcons).map(([key, { icon: Icon, color }]) => (
-                  <button
-                    key={key}
-                    onClick={() => setSelectedEnergy(key)}
-                    className={`p-4 rounded-lg border-2 transition-all duration-200 ${
-                      selectedEnergy === key
-                        ? 'border-purple-500 bg-purple-50'
-                        : 'border-gray-200 hover:border-gray-300'
-                    }`}
-                  >
-                    <Icon className={`w-6 h-6 mx-auto mb-2 ${color}`} />
-                    <span className="text-sm font-medium capitalize">{key}</span>
-                  </button>
-                ))}
+                {Object.entries(energyIcons).map(([key, { icon: Icon, color }]) => {
+                  const energyDescriptions = {
+                    creation: "Perfect for writing, designing, and bringing new ideas to life",
+                    focus: "Ideal for deep work, studying, and tasks requiring concentration", 
+                    brainstorm: "Great for ideation, problem-solving, and creative thinking",
+                    study: "Best for learning, reading, and absorbing new information",
+                    planning: "Optimal for organizing, strategizing, and project planning",
+                    reflection: "Perfect for introspection, meditation, and processing experiences"
+                  };
+                  
+                  return (
+                    <div key={key} className="relative group">
+                      <button
+                        onClick={() => setSelectedEnergy(key)}
+                        className={`w-full p-4 rounded-lg border-2 transition-all duration-200 ${
+                          selectedEnergy === key
+                            ? 'border-purple-500 bg-purple-50'
+                            : 'border-gray-200 hover:border-gray-300'
+                        }`}
+                      >
+                        <Icon className={`w-6 h-6 mx-auto mb-2 ${color}`} />
+                        <span className="text-sm font-medium capitalize">{key}</span>
+                      </button>
+                      
+                      {/* Tooltip */}
+                      <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 bg-slate-800/90 backdrop-blur-sm text-white px-3 py-2 rounded-lg text-xs opacity-0 group-hover:opacity-100 transition-all duration-300 z-50 w-48 shadow-lg pointer-events-none">
+                        <div className="text-center">{energyDescriptions[key as keyof typeof energyDescriptions]}</div>
+                        <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-3 border-r-3 border-t-3 border-transparent border-t-slate-800/90"></div>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-gray-700 mb-3">
                 Duration (minutes)
               </label>
-              <select
-                value={duration}
-                onChange={(e) => setDuration(Number(e.target.value))}
-                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-              >
-                <option value={15}>15 minutes</option>
-                <option value={25}>25 minutes</option>
-                <option value={45}>45 minutes</option>
-                <option value={60}>60 minutes</option>
-              </select>
+              <div className="grid grid-cols-5 sm:grid-cols-5 md:grid-cols-10 gap-2">
+                {[5, 10, 15, 25, 30, 45, 60, 90, 120, 180].map((minutes, index) => {
+                  const intensity = (index + 1) / 10; // 0.1 to 1.0
+                  const isSelected = duration === minutes;
+                  
+                  return (
+                    <button
+                      key={minutes}
+                      type="button"
+                      onClick={() => setDuration(minutes)}
+                      className={`
+                        relative px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 border-2
+                        ${isSelected 
+                          ? 'border-purple-500 text-purple-700 bg-purple-50 shadow-md' 
+                          : 'border-gray-200 hover:border-gray-300 text-gray-700'
+                        }
+                      `}
+                      style={{
+                        backgroundColor: isSelected 
+                          ? undefined 
+                          : `rgb(${255 - intensity * 80}, ${255 - intensity * 80}, ${255 - intensity * 80})`,
+                        color: isSelected 
+                          ? undefined 
+                          : intensity > 0.6 ? 'white' : 'rgb(75, 85, 99)'
+                      }}
+                    >
+                      {minutes}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
             <button
@@ -1038,7 +1085,7 @@ export const PulseApp: React.FC<PulseAppProps> = ({ config, onReconfigure }) => 
             <div className="mb-6">
               {selectedEnergy === 'creation' ? (
                 <div className="flex justify-center mb-4">
-                  <PulseShrineLogoSvg size={48} variant="white" />
+                  <PulseShrineLogoSvg size={96} variant="white" />
                 </div>
               ) : (
                 <EnergyIcon className={`w-12 h-12 mx-auto mb-4 ${energyIcons[selectedEnergy as keyof typeof energyIcons]?.color || 'text-purple-500'}`} />
@@ -1082,17 +1129,32 @@ export const PulseApp: React.FC<PulseAppProps> = ({ config, onReconfigure }) => 
             </div>
 
 
-            <button
-              onClick={stopPulse}
-              className="bg-orange-500/80 hover:bg-orange-600/80 text-white px-6 py-2 rounded-lg transition-colors text-sm"
-            >
-              Pause Session
-            </button>
+            <div className="flex justify-center space-x-4">
+              <button
+                onClick={() => setCurrentView('emotion')}
+                className="group relative bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white px-8 py-3 rounded-lg font-semibold transition-all duration-300 overflow-hidden"
+              >
+                {/* Breathing animation background */}
+                <div className="absolute inset-0 bg-gradient-to-r from-green-400 to-emerald-400 opacity-0 group-hover:opacity-20 animate-zen-breathe"></div>
+                
+                {/* Floating particles */}
+                <div className="absolute inset-0 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-500">
+                  <div className="absolute top-1/2 left-1/4 w-1 h-1 bg-white rounded-full animate-float" style={{animationDelay: '0s'}}></div>
+                  <div className="absolute top-1/3 right-1/3 w-1 h-1 bg-white rounded-full animate-float" style={{animationDelay: '0.5s'}}></div>
+                  <div className="absolute bottom-1/3 left-1/2 w-1 h-1 bg-white rounded-full animate-float" style={{animationDelay: '1s'}}></div>
+                </div>
+                
+                <span className="relative z-10 flex items-center space-x-2">
+                  <span>Complete & breathe</span>
+                  <span className="text-lg animate-pulse">✓</span>
+                </span>
+              </button>
+            </div>
           </div>
 
           <button
             onClick={() => setCurrentView('shrine')}
-            className="text-gray-300 hover:text-white transition-colors"
+            className="text-gray-300 hover:text-white transition-colors mt-4"
           >
             Return to Shrine
           </button>
@@ -1129,55 +1191,81 @@ export const PulseApp: React.FC<PulseAppProps> = ({ config, onReconfigure }) => 
           {error && <ErrorMessage message={error} onClose={() => setError(null)} />}
 
           <GuardianMessage>
-            {isPulsePaused 
-              ? "Your pulse is paused. You can resume your focus session or reflect on what you've accomplished so far."
-              : "Your pulse is complete. Now, reflect upon your experience and choose the emotion that best captures your journey. Share your insights and learnings - this reflection will become the essence of your new mindful stone."
-            }
+            Your pulse is complete. Now, reflect upon your experience and choose the emotion that best captures your journey. Share your insights and learnings - this reflection will become the essence of your new mindful stone.
           </GuardianMessage>
 
-          {isPulsePaused && (
-            <div className="mb-6">
-              <button
-                onClick={resumePulse}
-                className="w-full bg-gradient-to-r from-green-500 to-emerald-500 text-white py-4 px-6 rounded-lg font-semibold hover:from-green-600 hover:to-emerald-600 transition-all duration-300 flex items-center justify-center space-x-2"
-              >
-                <Play className="w-5 h-5" />
-                <span>Resume Focus Session ({formatTime(timeLeft)} remaining)</span>
-              </button>
+          {activePulse && (
+            <div className="bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-lg p-4 mb-6">
+              <h3 className="font-semibold text-purple-800 mb-2">Your Focus Session</h3>
+              <div className="text-purple-700">
+                <p className="font-medium">"{activePulse.intent}"</p>
+                <div className="flex items-center space-x-4 mt-2 text-sm">
+                  <div className="flex items-center space-x-1">
+                    {energyIcons[selectedEnergy as keyof typeof energyIcons] && (
+                      <>
+                        {React.createElement(energyIcons[selectedEnergy as keyof typeof energyIcons].icon, {
+                          className: `w-4 h-4 ${energyIcons[selectedEnergy as keyof typeof energyIcons].color}`
+                        })}
+                        <span className="capitalize">{selectedEnergy} energy</span>
+                      </>
+                    )}
+                  </div>
+                  <div>Duration: {Math.ceil(activePulse.duration_seconds / 60)} minutes</div>
+                </div>
+              </div>
             </div>
           )}
 
+
           <div className="bg-white/70 backdrop-blur-sm rounded-xl p-8 border border-white/50">
             <h2 className="text-2xl font-semibold text-gray-800 mb-6 text-center">
-              {isPulsePaused ? "How do you feel so far?" : "How do you feel about your pulse?"}
+              How do you feel about your pulse?
             </h2>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-              {emotions.map((emotion) => (
-                <button
-                  key={emotion.key}
-                  onClick={() => setSelectedEmotion(emotion.key)}
-                  className={`p-6 text-left border-2 rounded-lg transition-all duration-200 group ${
-                    selectedEmotion === emotion.key
-                      ? 'border-purple-500 bg-purple-50'
-                      : 'border-gray-200 hover:border-purple-300 hover:bg-purple-25'
-                  }`}
-                >
-                  <div className="flex items-center space-x-4">
-                    <span className="text-3xl">{emotion.icon}</span>
-                    <div>
-                      <h3 className={`font-semibold ${
-                        selectedEmotion === emotion.key 
-                          ? 'text-purple-700' 
-                          : 'text-gray-800 group-hover:text-purple-700'
-                      }`}>
-                        {emotion.label}
-                      </h3>
-                      <p className="text-sm text-gray-600">{emotion.desc}</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+              {emotions.map((emotion) => {
+                const emotionMeanings = {
+                  fulfilled: "You achieved what you set out to do and feel a deep sense of satisfaction",
+                  peaceful: "You feel calm, serene, and emotionally balanced from your practice", 
+                  energized: "You feel invigorated, motivated, and ready to take on challenges",
+                  focused: "Your mind feels clear, sharp, and able to concentrate deeply",
+                  creative: "You feel inspired, imaginative, and ready to express new ideas",
+                  grounded: "You feel stable, centered, and connected to the present moment"
+                };
+                
+                return (
+                  <div key={emotion.key} className="relative group">
+                    <button
+                      onClick={() => setSelectedEmotion(emotion.key)}
+                      className={`w-full h-32 p-6 text-left border-2 rounded-lg transition-all duration-200 group flex items-center ${
+                        selectedEmotion === emotion.key
+                          ? 'border-purple-500 bg-purple-50'
+                          : 'border-gray-200 hover:border-purple-300 hover:bg-purple-25'
+                      }`}
+                    >
+                      <div className="flex items-center space-x-4 w-full">
+                        <span className="text-4xl flex-shrink-0">{emotion.icon}</span>
+                        <div className="flex-1 min-w-0">
+                          <h3 className={`font-semibold text-lg ${
+                            selectedEmotion === emotion.key 
+                              ? 'text-purple-700' 
+                              : 'text-gray-800 group-hover:text-purple-700'
+                          }`}>
+                            {emotion.label}
+                          </h3>
+                          <p className="text-sm text-gray-600 leading-relaxed">{emotion.desc}</p>
+                        </div>
+                      </div>
+                    </button>
+                    
+                    {/* Tooltip */}
+                    <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 bg-slate-800/90 backdrop-blur-sm text-white px-4 py-2 rounded-lg text-sm opacity-0 group-hover:opacity-100 transition-all duration-300 z-50 w-72 shadow-lg pointer-events-none">
+                      <div className="text-center">{emotionMeanings[emotion.key as keyof typeof emotionMeanings]}</div>
+                      <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-slate-800/90"></div>
                     </div>
                   </div>
-                </button>
-              ))}
+                );
+              })}
             </div>
 
             <div className="mb-6">
@@ -1204,12 +1292,7 @@ export const PulseApp: React.FC<PulseAppProps> = ({ config, onReconfigure }) => 
             >
               <Sparkles className="w-5 h-5" />
               <span>
-                {isLoading 
-                  ? 'Creating...' 
-                  : isPulsePaused 
-                    ? 'Complete Pulse Early' 
-                    : 'Create Focus Stone'
-                }
+                {isLoading ? 'Creating...' : 'Create Focus Stone'}
               </span>
             </button>
           </div>

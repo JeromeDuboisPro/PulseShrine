@@ -39,11 +39,18 @@
   }
   
   .animate-zen-breathe {
-    animation: zen-breathe 6s ease-in-out infinite;
+    animation: zen-breathe 10s ease-in-out infinite;
   }
   
   .backdrop-blur-xs {
     backdrop-filter: blur(2px);
+  }
+  
+  .line-clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
   }
 }
 
@@ -94,10 +101,25 @@
 @keyframes zen-breathe {
   0%, 100% {
     transform: scale(1);
-    opacity: 0.3;
+    opacity: 0.1;
   }
   50% {
     transform: scale(1.05);
-    opacity: 0.6;
+    opacity: 0.3;
+  }
+}
+
+@keyframes float {
+  0% {
+    transform: translateY(0px);
+    opacity: 0.8;
+  }
+  50% {
+    transform: translateY(-15px);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-25px);
+    opacity: 0;
   }
 }

@@ -43,6 +43,18 @@ export interface StopPulse {
     estimated_cost_cents: number;
     could_be_enhanced?: boolean;
   };
+  ai_selection_info?: {
+    decision_reason: string;
+    worthiness_score: number;
+    estimated_cost_cents: number;
+    could_be_enhanced: boolean;
+    budget_status: {
+      daily_used: number;
+      monthly_used: number;
+      user_tier: string;
+    };
+    timestamp: string;
+  };
 }
 
 export interface IngestedPulse {
@@ -80,6 +92,18 @@ export interface IngestedPulse {
     worthiness_score: number;
     estimated_cost_cents: number;
     could_be_enhanced?: boolean;
+  };
+  ai_selection_info?: {
+    decision_reason: string;
+    worthiness_score: number;
+    estimated_cost_cents: number;
+    could_be_enhanced: boolean;
+    budget_status: {
+      daily_used: number;
+      monthly_used: number;
+      user_tier: string;
+    };
+    timestamp: string;
   };
 }
 

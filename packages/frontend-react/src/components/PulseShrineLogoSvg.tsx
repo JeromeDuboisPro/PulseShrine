@@ -39,10 +39,8 @@ export const PulseShrineLogoSvg: React.FC<PulseShrineLogoSvgProps> = ({
       xmlns="http://www.w3.org/2000/svg"
       width={size}
       height={size}
-      className={`${className} animate-pulse-gentle`}
-      style={{
-        filter: 'drop-shadow(0 0 4px rgba(147, 51, 234, 0.2))'
-      }}
+      className={`${className}`}
+      style={{backgroundColor: 'transparent'}}
     >
       {/* Definitions */}
       <defs>
