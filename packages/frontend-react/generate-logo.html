@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>PulseShrine Logo Generator</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            padding: 20px; 
+            background: #f5f5f5;
+        }
+        .container { 
+            max-width: 600px; 
+            margin: 0 auto; 
+            background: white; 
+            padding: 30px; 
+            border-radius: 10px; 
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .logo-container { 
+            text-align: center; 
+            margin: 30px 0; 
+            padding: 40px;
+            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+            border-radius: 15px;
+        }
+        button { 
+            background: #9333ea; 
+            color: white; 
+            border: none; 
+            padding: 12px 24px; 
+            border-radius: 8px; 
+            cursor: pointer; 
+            font-size: 16px;
+            margin: 10px;
+        }
+        button:hover { 
+            background: #7c3aed; 
+        }
+        #downloadLink { 
+            display: none; 
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>PulseShrine Logo Generator</h1>
+        <p>Click the button below to generate and download a PNG of the PulseShrine logo.</p>
+        
+        <div class="logo-container">
+            <svg id="logoSvg" viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg" width="200" height="200">
+                <defs>
+                    <radialGradient id="nodeGradient">
+                        <stop offset="0%" style="stop-color:#f0c4ff;stop-opacity:1" />
+                        <stop offset="100%" style="stop-color:#e0aaff;stop-opacity:1" />
+                    </radialGradient>
+                    <linearGradient id="accentGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                        <stop offset="0%" style="stop-color:#ffffff;stop-opacity:0.8" />
+                        <stop offset="100%" style="stop-color:#f0c4ff;stop-opacity:0.6" />
+                    </linearGradient>
+                </defs>
+                
+                <g transform="translate(200, 200)">
+                    <!-- Base connections -->
+                    <line x1="-120" y1="120" x2="-80" y2="120" stroke="#9333ea" stroke-width="2.5" opacity="0.4"/>
+                    <line x1="-40" y1="120" x2="0" y2="120" stroke="#9333ea" stroke-width="2.5" opacity="0.4"/>
+                    <line x1="40" y1="120" x2="80" y2="120" stroke="#9333ea" stroke-width="2.5" opacity="0.4"/>
+                    <line x1="80" y1="120" x2="120" y2="120" stroke="#9333ea" stroke-width="2.5" opacity="0.4"/>
+                    
+                    <!-- Vertical connections -->
+                    <line x1="-80" y1="120" x2="-80" y2="60" stroke="#9333ea" stroke-width="2.5" opacity="0.4"/>
+                    <line x1="0" y1="120" x2="0" y2="60" stroke="#9333ea" stroke-width="2.5" opacity="0.4"/>
+                    <line x1="80" y1="120" x2="80" y2="60" stroke="#9333ea" stroke-width="2.5" opacity="0.4"/>
+                    
+                    <!-- Mid-level connections -->
+                    <line x1="-80" y1="60" x2="-40" y2="20" stroke="#9333ea" stroke-width="2.5" opacity="0.5"/>
+                    <line x1="0" y1="60" x2="0" y2="20" stroke="#9333ea" stroke-width="2.5" opacity="0.5"/>
+                    <line x1="80" y1="60" x2="40" y2="20" stroke="#9333ea" stroke-width="2.5" opacity="0.5"/>
+                    
+                    <!-- Upper connections -->
+                    <line x1="-40" y1="20" x2="0" y2="-40" stroke="#9333ea" stroke-width="2.5" opacity="0.6"/>
+                    <line x1="0" y1="20" x2="0" y2="-40" stroke="#9333ea" stroke-width="2.5" opacity="0.6"/>
+                    <line x1="40" y1="20" x2="0" y2="-40" stroke="#9333ea" stroke-width="2.5" opacity="0.6"/>
+                    
+                    <!-- Top connection -->
+                    <line x1="0" y1="-40" x2="0" y2="-100" stroke="#9333ea" stroke-width="2.5" opacity="0.7"/>
+                    
+                    <!-- Shrine outline -->
+                    <rect x="-100" y="100" width="200" height="20" fill="none" stroke="#9333ea" stroke-width="3" opacity="0.7"/>
+                    
+                    <!-- Main body -->
+                    <path d="M -80,100 L -80,40 L -40,0 L 0,-60 L 40,0 L 80,40 L 80,100" 
+                          fill="none" 
+                          stroke="#9333ea" 
+                          stroke-width="3" 
+                          opacity="0.8"/>
+                    
+                    <!-- Roof structure -->
+                    <path d="M -100,40 L 0,-80 L 100,40" 
+                          fill="none" 
+                          stroke="#9333ea" 
+                          stroke-width="3" 
+                          opacity="0.8"/>
+                    
+                    <!-- Neural nodes -->
+                    <circle cx="-80" cy="120" r="6" fill="url(#nodeGradient)" stroke="#9333ea" stroke-width="1.5" opacity="0.8"/>
+                    <circle cx="0" cy="120" r="6" fill="url(#nodeGradient)" stroke="#9333ea" stroke-width="1.5" opacity="0.8"/>
+                    <circle cx="80" cy="120" r="6" fill="url(#nodeGradient)" stroke="#9333ea" stroke-width="1.5" opacity="0.8"/>
+                    
+                    <circle cx="-80" cy="60" r="8" fill="url(#nodeGradient)" stroke="#9333ea" stroke-width="1.5" opacity="0.9"/>
+                    <circle cx="0" cy="60" r="8" fill="url(#nodeGradient)" stroke="#9333ea" stroke-width="1.5" opacity="0.9"/>
+                    <circle cx="80" cy="60" r="8" fill="url(#nodeGradient)" stroke="#9333ea" stroke-width="1.5" opacity="0.9"/>
+                    
+                    <circle cx="-40" cy="20" r="10" fill="url(#nodeGradient)" stroke="#9333ea" stroke-width="2"/>
+                    <circle cx="40" cy="20" r="10" fill="url(#nodeGradient)" stroke="#9333ea" stroke-width="2"/>
+                    
+                    <circle cx="0" cy="-40" r="12" fill="url(#nodeGradient)" stroke="#9333ea" stroke-width="2.5"/>
+                    <circle cx="0" cy="-100" r="8" fill="url(#accentGradient)" stroke="#9333ea" stroke-width="2.5"/>
+                    
+                    <!-- Circuit details -->
+                    <rect x="-4" y="-44" width="8" height="8" fill="none" stroke="#9333ea" stroke-width="1.5" opacity="0.7"/>
+                    <circle cx="0" cy="-40" r="4" fill="#9333ea" opacity="0.9"/>
+                    
+                    <!-- Additional details -->
+                    <line x1="-40" y1="100" x2="-40" y2="80" stroke="#9333ea" stroke-width="2.5" opacity="0.5"/>
+                    <line x1="40" y1="100" x2="40" y2="80" stroke="#9333ea" stroke-width="2.5" opacity="0.5"/>
+                    
+                    <circle cx="-40" cy="90" r="4" fill="#9333ea" opacity="0.6"/>
+                    <circle cx="40" cy="90" r="4" fill="#9333ea" opacity="0.6"/>
+                    <circle cx="0" cy="40" r="4" fill="#9333ea" opacity="0.6"/>
+                </g>
+            </svg>
+        </div>
+        
+        <div style="text-align: center;">
+            <button onclick="generatePNG(512)">Download 512x512 PNG</button>
+            <button onclick="generatePNG(256)">Download 256x256 PNG</button>
+            <button onclick="generatePNG(128)">Download 128x128 PNG</button>
+            <button onclick="generatePNG(64)">Download 64x64 PNG</button>
+        </div>
+        
+        <a id="downloadLink" download="pulseshrine-logo.png">Download PNG</a>
+    </div>
+
+    <script>
+        function generatePNG(size) {
+            const svg = document.getElementById('logoSvg');
+            const svgData = new XMLSerializer().serializeToString(svg);
+            
+            const canvas = document.createElement('canvas');
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d');
+            
+            // White background
+            ctx.fillStyle = 'white';
+            ctx.fillRect(0, 0, size, size);
+            
+            const img = new Image();
+            img.onload = function() {
+                ctx.drawImage(img, 0, 0, size, size);
+                
+                // Create download link
+                canvas.toBlob(function(blob) {
+                    const url = URL.createObjectURL(blob);
+                    const link = document.getElementById('downloadLink');
+                    link.href = url;
+                    link.download = `pulseshrine-logo-${size}x${size}.png`;
+                    link.style.display = 'block';
+                    link.textContent = `Download ${size}x${size} PNG`;
+                    link.click();
+                });
+            };
+            
+            const svgBlob = new Blob([svgData], {type: 'image/svg+xml;charset=utf-8'});
+            const url = URL.createObjectURL(svgBlob);
+            img.src = url;
+        }
+    </script>
+</body>
+</html>
