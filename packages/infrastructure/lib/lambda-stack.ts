@@ -11,6 +11,7 @@ interface LambdaStackProps extends cdk.StackProps {
   stopPulseTable: dynamodb.ITable;
   ingestedPulseTable: dynamodb.ITable;
   aiUsageTrackingTable: dynamodb.ITable;
+  usersTable: dynamodb.ITable;
   bedrockModelId?: string;
 }
 
@@ -49,6 +50,25 @@ export class LambdaStack extends cdk.Stack {
       description: "Shared dependencies layer",
     });
 
+    // AWS Managed Layer for Powertools
+    const awsLambdaPowertoolsLayerArn = `arn:aws:lambda:${this.region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python313-arm64:18`;
+
+    // X-Ray SDK Layer
+    const xrayLayer = new lambda.LayerVersion(this, "XRaySDKLayer", {
+      code: lambda.Code.fromAsset("layers/xray-sdk", {
+        bundling: {
+          image: lambda.Runtime.PYTHON_3_13.bundlingImage,
+          command: [
+            'bash', '-c',
+            'pip install -r requirements.txt -t /asset-output/python && cp -au . /asset-output/'
+          ],
+        },
+      }),
+      compatibleRuntimes: [lambda.Runtime.PYTHON_3_13],
+      compatibleArchitectures: [lambda.Architecture.ARM_64, lambda.Architecture.X86_64],
+      description: "AWS X-Ray SDK for Python",
+    });
+
     const bundlingAssetExcludes = [
       "**/__pycache__",
       "**/*.pyc",
@@ -61,7 +81,11 @@ export class LambdaStack extends cdk.Stack {
     const costOptimizedLambdaProps = {
       architecture: lambda.Architecture.ARM_64, // Better price/performance ratio
       runtime: lambda.Runtime.PYTHON_3_13,
-      layers: [sharedLayer],
+      layers: [
+        lambda.LayerVersion.fromLayerVersionArn(this, "PowertoolsLayerCostOpt", awsLambdaPowertoolsLayerArn),
+        xrayLayer,
+        sharedLayer
+      ],
       bundling: {
         assetExcludes: bundlingAssetExcludes,
       },
@@ -73,12 +97,22 @@ export class LambdaStack extends cdk.Stack {
       ...costOptimizedLambdaProps,
       timeout: cdk.Duration.seconds(15), // APIs need reasonable response times
       memorySize: 512, // Balance between cost and user experience
+      layers: [
+        lambda.LayerVersion.fromLayerVersionArn(this, "PowertoolsLayerApi", awsLambdaPowertoolsLayerArn),
+        xrayLayer,
+        sharedLayer
+      ],
     };
 
     const enhancementLambdaProps = {
       ...costOptimizedLambdaProps,
       timeout: cdk.Duration.seconds(120), // AI processing can be slower
       memorySize: 1024, // AI workloads may need more memory
+      layers: [
+        lambda.LayerVersion.fromLayerVersionArn(this, "PowertoolsLayerEnhance", awsLambdaPowertoolsLayerArn),
+        xrayLayer,
+        sharedLayer
+      ],
     };
 
     // Props for handlers with nested module structure (new pattern)
@@ -107,6 +141,7 @@ export class LambdaStack extends cdk.Stack {
       environment: {
         START_PULSE_TABLE_NAME: props.startPulseTable.tableName,
       },
+      memorySize: 128
     });
 
     this.pythonStopFunction = new PythonFunction(this, "StopPulse", {
@@ -119,6 +154,7 @@ export class LambdaStack extends cdk.Stack {
         START_PULSE_TABLE_NAME: props.startPulseTable.tableName,
         STOP_PULSE_TABLE_NAME: props.stopPulseTable.tableName,
       },
+      memorySize: 128
     });
 
     props.startPulseTable.grantReadWriteData(this.pythonStartFunction);
@@ -138,6 +174,7 @@ export class LambdaStack extends cdk.Stack {
         environment: {
           START_PULSE_TABLE_NAME: props.startPulseTable.tableName,
         },
+        memorySize: 192
       },
     );
     props.startPulseTable.grantReadData(this.pythonGetStartPulseFunction);
@@ -155,6 +192,7 @@ export class LambdaStack extends cdk.Stack {
         environment: {
           STOP_PULSE_TABLE_NAME: props.stopPulseTable.tableName,
         },
+        memorySize: 192
       },
     );
     props.stopPulseTable.grantReadData(this.pythonGetStopPulsesFunction);
@@ -172,6 +210,7 @@ export class LambdaStack extends cdk.Stack {
         environment: {
           INGESTED_PULSE_TABLE_NAME: props.ingestedPulseTable.tableName,
         },
+        memorySize: 192
       },
     );
     props.ingestedPulseTable.grantReadData(
@@ -193,6 +232,7 @@ export class LambdaStack extends cdk.Stack {
       environment: {
         PARAMETER_PREFIX: "/pulseshrine/ai/",
         AI_USAGE_TRACKING_TABLE_NAME: props.aiUsageTrackingTable.tableName,
+        USERS_TABLE_NAME: props.usersTable.tableName,
       },
     });
 
@@ -214,7 +254,9 @@ export class LambdaStack extends cdk.Stack {
           INGESTED_PULSE_TABLE_NAME: props.ingestedPulseTable.tableName,
           DEFAULT_BEDROCK_MODEL_ID: bedrockModelId,
           AI_USAGE_TRACKING_TABLE_NAME: props.aiUsageTrackingTable.tableName,
+          USERS_TABLE_NAME: props.usersTable.tableName,
         },
+        memorySize: 256
       },
     );
 
@@ -242,6 +284,10 @@ export class LambdaStack extends cdk.Stack {
       this.bedrockEnhancementFunction,
     );
 
+    // Grant Users table read/write access to AI functions (for plan lookup and auto-creating profiles)
+    props.usersTable.grantReadWriteData(this.aiSelectionFunction);
+    props.usersTable.grantReadWriteData(this.bedrockEnhancementFunction);
+
     // Grant Bedrock permissions to enhancement function
     this.bedrockEnhancementFunction.addToRolePolicy(
       new iam.PolicyStatement({
@@ -250,7 +296,10 @@ export class LambdaStack extends cdk.Stack {
           "bedrock:InvokeModel",
           "bedrock:InvokeModelWithResponseStream",
         ],
-        resources: ["arn:aws:bedrock:*:*:foundation-model/*"],
+        resources: [
+          "arn:aws:bedrock:*:*:foundation-model/*",
+          "arn:aws:bedrock:*:*:inference-profile/*"
+        ],
       }),
     );
 
@@ -279,12 +328,17 @@ export class LambdaStack extends cdk.Stack {
       environment: {
         STOP_PULSE_TABLE_NAME: props.stopPulseTable.tableName,
         INGESTED_PULSE_TABLE_NAME: props.ingestedPulseTable.tableName,
+        USERS_TABLE_NAME: props.usersTable.tableName,
       },
+      memorySize: 192
     });
 
     // Grant DynamoDB permissions
     props.ingestedPulseTable.grantWriteData(this.bedrockEnhancementFunction);
     props.ingestedPulseTable.grantWriteData(this.pureIngestFunction);
     props.stopPulseTable.grantReadWriteData(this.pureIngestFunction);
+
+    // Grant Users table read/write access to pure ingest function (for stats tracking)
+    props.usersTable.grantReadWriteData(this.pureIngestFunction);
   }
 }

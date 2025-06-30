@@ -23,6 +23,7 @@ const lambdaStack = new LambdaStack(app, 'LambdaStack', {
   stopPulseTable: infraStack.stopPulseTable,
   ingestedPulseTable: infraStack.ingestedPulseTable,
   aiUsageTrackingTable: infraStack.aiUsageTrackingTable,
+  usersTable: infraStack.usersTable,
   bedrockModelId: process.env.BEDROCK_MODEL_ID, // Allow override via env var
 });
 
@@ -34,7 +35,7 @@ const sfnStack = new SfnStack(app, 'SfnStack', {
   },
   stopPulseTable: infraStack.stopPulseTable,
   ingestedPulseTable: infraStack.ingestedPulseTable,
-  pulsesIngestionDDBDLQ: infraStack.pulsesIngestionQueueDLQ,
+  pulsesIngestionDDBDLQ: infraStack.pulsesIngestionDDBDLQ,
   aiSelectionFunction: lambdaStack.aiSelectionFunction,
   bedrockEnhancementFunction: lambdaStack.bedrockEnhancementFunction,
   standardEnhancementFunction: lambdaStack.standardEnhancementFunction,
