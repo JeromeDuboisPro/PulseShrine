@@ -1,5 +1,5 @@
+import { AlertCircle, Award, Brain, CreditCard, Heart, Moon, Mountain, Play, Settings, Sparkles, Star, Target, Zap } from 'lucide-react';
 import React, { useEffect, useRef, useState } from 'react';
-import { Heart, Moon, Mountain, Play, Sparkles, Target, Zap, Settings, Star, Brain, Award, CreditCard, AlertCircle } from 'lucide-react';
 import { ApiError, IngestedPulse, PulseAPI, StartPulse, StopPulse } from '../api';
 import { ApiConfig, updateConfig } from '../config';
 import { ConfigurationModal } from './ConfigurationModal';
@@ -24,7 +24,7 @@ export const PulseApp: React.FC<PulseAppProps> = ({ config, onReconfigure }) => 
   const [selectedEnergy, setSelectedEnergy] = useState('creation');
   const [duration, setDuration] = useState(25);
   const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading] = useState(false);
   const [showConfigModal, setShowConfigModal] = useState(false);
   const [planNotification, setPlanNotification] = useState<{
     message: string;
@@ -35,6 +35,7 @@ export const PulseApp: React.FC<PulseAppProps> = ({ config, onReconfigure }) => 
   const userIdRef = useRef(config.userId);
   const loadPulsesRef = useRef<(() => Promise<void>) | null>(null);
   const stableTimeLeftRef = useRef(0); // Stable reference to prevent flicker
+  const [stopButtonEnabled, setStopButtonEnabled] = useState(false);
 
   // Helper to detect connection/API issues
   const isConnectionError = (errorMessage: string | null): boolean => {
@@ -153,12 +154,15 @@ export const PulseApp: React.FC<PulseAppProps> = ({ config, onReconfigure }) => 
           }
         } else {
           // No active pulse on server, clear local state if needed
-          if (activePulse) {
+          // BUT don't interfere if we're in the middle of creating a pulse (optimistic UI)
+          if (activePulse && !isRunning) {
             console.log('Server reports no active pulse, clearing local state');
             setActivePulse(null);
             setIsRunning(false);
             setClientTimerActive(false);
             setTimerInitialized(false);
+          } else if (isRunning && !activePulse) {
+            console.log('Timer is running optimistically, waiting for server to catch up');
           }
         }
         
@@ -246,33 +250,34 @@ export const PulseApp: React.FC<PulseAppProps> = ({ config, onReconfigure }) => 
   const startNewPulse = async () => {
     if (!intention.trim()) return;
     
-    setIsLoading(true);
     setError(null);
     
+    // Optimistic UI - immediately start timer and navigate
+    console.log('Starting new pulse - navigating to timer view');
+    setCurrentView('timer');
+    setTimeLeft(duration * 60);
+    stableTimeLeftRef.current = duration * 60;
+    setIsRunning(true);
+    setClientTimerActive(true);
+    setTimerInitialized(true);
+    setStopButtonEnabled(false); // Disable stop button until API responds
+    
+    // Set absolute end time for client timer
+    const endTime = Date.now() + (duration * 60 * 1000);
+    setTimerEndTime(endTime);
+    
+    // Make async API call
     try {
       const pulse = await PulseAPI.startPulse(userIdRef.current, intention, duration * 60, selectedEnergy);
       setActivePulse(pulse);
-      setTimeLeft(duration * 60);
-      stableTimeLeftRef.current = duration * 60; // Initialize stable ref
-      setCurrentView('timer');
-      setIsRunning(true); // Auto-start the timer for new pulse
-      setClientTimerActive(true); // Take control from server polling
-      setTimerInitialized(true); // Mark timer as initialized
-      
-      // Set absolute end time for client timer
-      const endTime = Date.now() + (duration * 60 * 1000);
-      setTimerEndTime(endTime);
-      console.log('Timer will end at:', new Date(endTime).toISOString());
-      
-      // Don't refresh pulses immediately to avoid overwriting the timer
-      // The polling will pick up the change in 30 seconds
+      setStopButtonEnabled(true); // Enable stop button on success
     } catch (err) {
-      const errorMessage = err instanceof ApiError 
-        ? err.message 
-        : 'Failed to start pulse. Please try again.';
-      setError(errorMessage);
-    } finally {
-      setIsLoading(false);
+      // On error, show zen error screen
+      setIsRunning(false);
+      setClientTimerActive(false);
+      setTimerEndTime(null);
+      setTimerInitialized(false);
+      setCurrentView('zen-error');
     }
   };
 
@@ -282,43 +287,38 @@ export const PulseApp: React.FC<PulseAppProps> = ({ config, onReconfigure }) => 
   const submitEmotion = async (emotion: string, reflection = '') => {
     if (!activePulse) return;
     
-    setIsLoading(true);
-    setError(null);
+    // Immediately navigate to shrine (optimistic UI)
+    setActivePulse(null);
+    setIntention('');
+    setSelectedEnergy('creation');
+    setDuration(25);
+    setCurrentView('shrine');
+    setClientTimerActive(false);
+    setTimerEndTime(null);
+    setTimerInitialized(false);
+    setStopButtonEnabled(false);
     
-    try {
-      await PulseAPI.stopPulse(userIdRef.current, reflection, emotion);
-      
-      // Reset state
-      setActivePulse(null);
-      setIntention('');
-      setSelectedEnergy('creation');
-      setDuration(25);
-      setCurrentView('shrine');
-      setClientTimerActive(false); // Release control back to server
-      setTimerEndTime(null); // Clear the end time
-      setTimerInitialized(false); // Allow future timers to auto-resume
-      
-      // Show completion notification
-      setPlanNotification({
-        message: 'Mindful stone created! Your pulse is now processing...',
-        type: 'achievement'
+    // Show completion notification
+    setPlanNotification({
+      message: 'Mindful stone created! Your pulse is now processing...',
+      type: 'achievement'
+    });
+    
+    // Auto-dismiss notification after 5 seconds
+    setTimeout(() => setPlanNotification(null), 5000);
+    
+    // Fire-and-forget API call
+    PulseAPI.stopPulse(userIdRef.current, reflection, emotion)
+      .then(() => {
+        // Refresh pulses in background to show completed pulse
+        if (loadPulsesRef.current) {
+          loadPulsesRef.current();
+        }
+      })
+      .catch(err => {
+        // Silently log error - user experience is not affected
+        console.error('Failed to stop pulse:', err);
       });
-      
-      // Auto-dismiss notification after 5 seconds
-      setTimeout(() => setPlanNotification(null), 5000);
-      
-      // Refresh pulses to show the completed pulse
-      if (loadPulsesRef.current) {
-        await loadPulsesRef.current();
-      }
-    } catch (err) {
-      const errorMessage = err instanceof ApiError 
-        ? err.message 
-        : 'Failed to complete pulse. Please try again.';
-      setError(errorMessage);
-    } finally {
-      setIsLoading(false);
-    }
   };
 
   const GuardianMessage = ({ children }: { children: React.ReactNode }) => (
@@ -427,15 +427,28 @@ export const PulseApp: React.FC<PulseAppProps> = ({ config, onReconfigure }) => 
     
     // Add stopped pulses that haven't been ingested yet (processing state)
     curatedStoppedPulses.forEach(pulse => {
-      if (displayPulses.length < MAX_STONES) {
-        displayPulses.push({
-          ...pulse,
-          gen_title: pulse.gen_title || '⚡ Processing...',
-          gen_badge: '⏳', // Processing indicator
-          processing: true // Add flag to identify processing pulses
-        } as IngestedPulse & { processing: boolean });
-      }
+      // Add the processing pulse
+      displayPulses.push({
+        ...pulse,
+        gen_title: pulse.gen_title || '⚡ Processing...',
+        gen_badge: '⏳', // Processing indicator
+        processing: true // Add flag to identify processing pulses
+      } as IngestedPulse & { processing: boolean });
     });
+    
+    // If we exceed MAX_STONES, remove the oldest completed pulses (not processing ones)
+    if (displayPulses.length > MAX_STONES) {
+      // Separate processing and completed pulses
+      const processingPulses = displayPulses.filter((p: any) => p.processing);
+      const completedPulsesOnly = displayPulses.filter((p: any) => !p.processing);
+      
+      // Keep the most recent completed pulses and all processing pulses
+      const keepCompletedCount = MAX_STONES - processingPulses.length;
+      const recentCompletedPulses = completedPulsesOnly.slice(-keepCompletedCount);
+      
+      // Combine: recent completed + all processing pulses
+      displayPulses = [...recentCompletedPulses, ...processingPulses];
+    }
 
     return (
       <div className="min-h-screen bg-gradient-to-br from-green-50 via-blue-50 to-purple-50 p-6">
@@ -731,6 +744,7 @@ export const PulseApp: React.FC<PulseAppProps> = ({ config, onReconfigure }) => 
                       if (isRunning && timerEndTime) {
                         console.log('Timer already running, just navigating to timer view');
                         setCurrentView('timer');
+                        setStopButtonEnabled(true); // Enable stop button when resuming
                       } else {
                         // Timer not running, need to start/resume it
                         const serverRemaining = activePulse.remaining_seconds !== undefined 
@@ -747,6 +761,7 @@ export const PulseApp: React.FC<PulseAppProps> = ({ config, onReconfigure }) => 
                           setIsRunning(true);
                           setClientTimerActive(true);
                           setTimerEndTime(Date.now() + (serverRemaining * 1000));
+                          setStopButtonEnabled(true); // Enable stop button for resumed sessions
                         } else {
                           setCurrentView('emotion');
                         }
@@ -1006,13 +1021,14 @@ export const PulseApp: React.FC<PulseAppProps> = ({ config, onReconfigure }) => 
   );
 
   const renderTimer = () => {
-    if (!activePulse) {
+    // Allow timer to show while waiting for API response during optimistic UI
+    if (!activePulse && !isRunning) {
       setCurrentView('shrine');
       return null;
     }
 
     const EnergyIcon = energyIcons[selectedEnergy as keyof typeof energyIcons]?.icon || Target;
-    const totalDuration = activePulse.duration_seconds;
+    const totalDuration = activePulse?.duration_seconds || (duration * 60);
     const currentTimeLeft = timeLeft;
     const progress = currentTimeLeft > 0 ? ((totalDuration - currentTimeLeft) / totalDuration) * 100 : 100;
 
@@ -1090,7 +1106,7 @@ export const PulseApp: React.FC<PulseAppProps> = ({ config, onReconfigure }) => 
               ) : (
                 <EnergyIcon className={`w-12 h-12 mx-auto mb-4 ${energyIcons[selectedEnergy as keyof typeof energyIcons]?.color || 'text-purple-500'}`} />
               )}
-              <h3 className="text-xl font-semibold mb-2">{activePulse.intent}</h3>
+              <h3 className="text-xl font-semibold mb-2">{activePulse?.intent || intention}</h3>
               <p className="text-sm text-gray-300 capitalize">{selectedEnergy} energy</p>
             </div>
 
@@ -1132,21 +1148,30 @@ export const PulseApp: React.FC<PulseAppProps> = ({ config, onReconfigure }) => 
             <div className="flex justify-center space-x-4">
               <button
                 onClick={() => setCurrentView('emotion')}
-                className="group relative bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white px-8 py-3 rounded-lg font-semibold transition-all duration-300 overflow-hidden"
+                disabled={!stopButtonEnabled}
+                className={`group relative px-8 py-3 rounded-lg font-semibold transition-all duration-300 overflow-hidden ${
+                  stopButtonEnabled 
+                    ? 'bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white' 
+                    : 'bg-gray-400 text-gray-200 cursor-not-allowed'
+                }`}
               >
                 {/* Breathing animation background */}
-                <div className="absolute inset-0 bg-gradient-to-r from-green-400 to-emerald-400 opacity-0 group-hover:opacity-20 animate-zen-breathe"></div>
+                {stopButtonEnabled && (
+                  <div className="absolute inset-0 bg-gradient-to-r from-green-400 to-emerald-400 opacity-0 group-hover:opacity-20 animate-zen-breathe"></div>
+                )}
                 
                 {/* Floating particles */}
-                <div className="absolute inset-0 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-500">
-                  <div className="absolute top-1/2 left-1/4 w-1 h-1 bg-white rounded-full animate-float" style={{animationDelay: '0s'}}></div>
-                  <div className="absolute top-1/3 right-1/3 w-1 h-1 bg-white rounded-full animate-float" style={{animationDelay: '0.5s'}}></div>
-                  <div className="absolute bottom-1/3 left-1/2 w-1 h-1 bg-white rounded-full animate-float" style={{animationDelay: '1s'}}></div>
-                </div>
+                {stopButtonEnabled && (
+                  <div className="absolute inset-0 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-500">
+                    <div className="absolute top-1/2 left-1/4 w-1 h-1 bg-white rounded-full animate-float" style={{animationDelay: '0s'}}></div>
+                    <div className="absolute top-1/3 right-1/3 w-1 h-1 bg-white rounded-full animate-float" style={{animationDelay: '0.5s'}}></div>
+                    <div className="absolute bottom-1/3 left-1/2 w-1 h-1 bg-white rounded-full animate-float" style={{animationDelay: '1s'}}></div>
+                  </div>
+                )}
                 
                 <span className="relative z-10 flex items-center space-x-2">
-                  <span>Complete & breathe</span>
-                  <span className="text-lg animate-pulse">✓</span>
+                  <span>{stopButtonEnabled ? 'Complete & breathe' : 'Starting session...'}</span>
+                  <span className="text-lg animate-pulse">{stopButtonEnabled ? '✓' : '⏳'}</span>
                 </span>
               </button>
             </div>
@@ -1302,6 +1327,46 @@ export const PulseApp: React.FC<PulseAppProps> = ({ config, onReconfigure }) => 
   };
 
   // Main render logic
+  const renderZenError = () => {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-50 p-6">
+        <div className="max-w-2xl mx-auto flex flex-col items-center justify-center min-h-screen">
+          <div className="bg-white/70 backdrop-blur-sm rounded-xl p-12 border border-white/50 text-center">
+            <div className="text-6xl mb-6 animate-pulse">🧘</div>
+            
+            <h2 className="text-2xl font-light text-gray-800 mb-4">
+              The Guardian is Searching for Your Pulse...
+            </h2>
+            
+            <p className="text-gray-600 mb-8 max-w-md mx-auto">
+              Your pulse energy seems to have wandered into the ethereal realm. 
+              The zen guardian is gently guiding it back to our garden.
+            </p>
+            
+            <div className="space-y-3">
+              <p className="text-sm text-gray-500 italic">
+                "Sometimes the path requires a moment of stillness before we can continue."
+              </p>
+              
+              <button
+                onClick={() => {
+                  setCurrentView('shrine');
+                  setIntention('');
+                  setSelectedEnergy('creation');
+                  setDuration(25);
+                }}
+                className="mt-6 bg-gradient-to-r from-purple-500 to-blue-500 text-white px-8 py-3 rounded-lg font-semibold hover:from-purple-600 hover:to-blue-600 transition-all duration-300 flex items-center justify-center space-x-2 mx-auto"
+              >
+                <Mountain className="w-5 h-5" />
+                <span>Return to Your Zen Garden</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const renderCurrentView = () => {
     if (currentView === 'shrine') {
       return renderShrine();
@@ -1311,6 +1376,8 @@ export const PulseApp: React.FC<PulseAppProps> = ({ config, onReconfigure }) => 
       return renderTimer();
     } else if (currentView === 'emotion') {
       return renderEmotion();
+    } else if (currentView === 'zen-error') {
+      return renderZenError();
     }
     return null;
   };
