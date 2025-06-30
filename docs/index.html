@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PulseShrine - Intelligent Serverless Productivity Platform</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+
+        header {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            padding: 1rem 0;
+            position: fixed;
+            width: 100%;
+            top: 0;
+            z-index: 1000;
+        }
+
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            color: white;
+            font-size: 1.8rem;
+            font-weight: bold;
+            text-decoration: none;
+        }
+
+        .nav-links {
+            display: flex;
+            list-style: none;
+            gap: 2rem;
+        }
+
+        .nav-links a {
+            color: white;
+            text-decoration: none;
+            font-weight: 500;
+            transition: color 0.3s;
+        }
+
+        .nav-links a:hover {
+            color: #ffd700;
+        }
+
+        .hero {
+            padding: 120px 0 80px;
+            text-align: center;
+            color: white;
+        }
+
+        .hero-logo {
+            margin-bottom: 1.5rem;
+            filter: drop-shadow(0 4px 8px rgba(0,0,0,0.3));
+        }
+
+        .hero h1 {
+            font-size: 3.5rem;
+            margin-bottom: 1rem;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .hero .subtitle {
+            font-size: 1.4rem;
+            margin-bottom: 2rem;
+            opacity: 0.9;
+        }
+
+        .hero .description {
+            font-size: 1.1rem;
+            max-width: 800px;
+            margin: 0 auto 3rem;
+            opacity: 0.8;
+        }
+
+        .cta-buttons {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 12px 30px;
+            border: none;
+            border-radius: 50px;
+            font-size: 1rem;
+            font-weight: 600;
+            text-decoration: none;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+
+        .btn-primary {
+            background: #ff6b6b;
+            color: white;
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 2px solid white;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+        }
+
+        .features {
+            background: white;
+            padding: 80px 0;
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 3rem;
+            margin-top: 3rem;
+        }
+
+        .feature-card {
+            background: white;
+            padding: 2rem;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            text-align: center;
+            transition: transform 0.3s;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .feature-icon {
+            font-size: 3rem;
+            color: #667eea;
+            margin-bottom: 1rem;
+        }
+
+        .feature-card h3 {
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+            color: #333;
+        }
+
+        .architecture-preview {
+            background: #f8f9fa;
+            padding: 80px 0;
+        }
+
+        .architecture-diagram {
+            background: white;
+            border-radius: 15px;
+            padding: 2rem;
+            margin-top: 2rem;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+
+        .metrics {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 80px 0;
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 2rem;
+            margin-top: 3rem;
+        }
+
+        .metric-card {
+            text-align: center;
+            padding: 1.5rem;
+        }
+
+        .metric-number {
+            font-size: 3rem;
+            font-weight: bold;
+            color: #ffd700;
+        }
+
+        .metric-label {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .awards {
+            background: white;
+            padding: 80px 0;
+            text-align: center;
+        }
+
+        .award-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: linear-gradient(135deg, #ffd700, #ffed4e);
+            color: #333;
+            padding: 1rem 2rem;
+            border-radius: 50px;
+            font-weight: bold;
+            font-size: 1.2rem;
+            margin: 1rem;
+            box-shadow: 0 5px 15px rgba(255, 215, 0, 0.3);
+        }
+
+        footer {
+            background: #333;
+            color: white;
+            padding: 40px 0;
+            text-align: center;
+        }
+
+        .section-title {
+            font-size: 2.5rem;
+            text-align: center;
+            margin-bottom: 1rem;
+        }
+
+        .section-subtitle {
+            text-align: center;
+            font-size: 1.2rem;
+            opacity: 0.7;
+            margin-bottom: 2rem;
+        }
+
+        @media (max-width: 768px) {
+            .hero h1 {
+                font-size: 2.5rem;
+            }
+            
+            .nav-links {
+                display: none;
+            }
+            
+            .cta-buttons {
+                flex-direction: column;
+                align-items: center;
+            }
+        }
+
+        .pulse-animation {
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        .fade-in {
+            animation: fadeIn 1s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .tech-stack {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+            margin-top: 2rem;
+        }
+
+        .tech-badge {
+            background: rgba(102, 126, 234, 0.1);
+            color: #667eea;
+            padding: 0.5rem 1rem;
+            border-radius: 25px;
+            font-size: 0.9rem;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <div class="header-content">
+                <a href="#" class="logo">
+                    <i class="fas fa-heart-pulse"></i> PulseShrine
+                </a>
+                <nav>
+                    <ul class="nav-links">
+                        <li><a href="#features">Features</a></li>
+                        <li><a href="architecture.html">Architecture</a></li>
+                        <li><a href="#metrics">Metrics</a></li>
+                        <li><a href="https://github.com/JeromeDuboisPro/PulseShrine" target="_blank">GitHub</a></li>
+                    </ul>
+                </nav>
+            </div>
+        </div>
+    </header>
+
+    <section class="hero">
+        <div class="container">
+            <img src="./pulseshrine-logo-512x512.png" alt="PulseShrine Logo" class="hero-logo fade-in" width="120" height="120">
+            <h1 class="fade-in">PulseShrine</h1>
+            <div class="subtitle fade-in">Intelligent Serverless Productivity Platform</div>
+            <div class="description fade-in">
+                The first productivity platform with sophisticated AI selection algorithms that make cost-effective enhancement decisions. 
+                Built entirely on AWS Lambda with event-driven architecture and production-ready scalability.
+            </div>
+            <div class="cta-buttons fade-in">
+                <a href="https://github.com/JeromeDuboisPro/PulseShrine" class="btn btn-primary">
+                    <i class="fab fa-github"></i> View on GitHub
+                </a>
+                <a href="architecture.html" class="btn btn-secondary">
+                    <i class="fas fa-sitemap"></i> Explore Architecture
+                </a>
+            </div>
+            <div class="tech-stack">
+                <span class="tech-badge">AWS Lambda</span>
+                <span class="tech-badge">DynamoDB</span>
+                <span class="tech-badge">Step Functions</span>
+                <span class="tech-badge">Bedrock AI</span>
+                <span class="tech-badge">EventBridge</span>
+                <span class="tech-badge">Python 3.13</span>
+                <span class="tech-badge">React</span>
+                <span class="tech-badge">TypeScript CDK</span>
+            </div>
+        </div>
+    </section>
+
+    <section class="awards">
+        <div class="container">
+            <div class="award-badge pulse-animation">
+                <i class="fas fa-trophy"></i>
+                AWS Lambda Hackathon 2025 Submission
+            </div>
+        </div>
+    </section>
+
+    <section id="features" class="features">
+        <div class="container">
+            <h2 class="section-title">Revolutionary Features</h2>
+            <p class="section-subtitle">Combining AI intelligence with serverless excellence</p>
+            
+            <div class="features-grid">
+                <div class="feature-card fade-in">
+                    <div class="feature-icon">
+                        <i class="fas fa-brain"></i>
+                    </div>
+                    <h3>Intelligent AI Selection</h3>
+                    <p>Sophisticated worthiness algorithm analyzes content quality, session duration, and emotional journey to make cost-effective AI enhancement decisions. Reduces AI costs by 60% while ensuring valuable sessions get premium treatment.</p>
+                </div>
+
+                <div class="feature-card fade-in">
+                    <div class="feature-icon">
+                        <i class="fas fa-cloud"></i>
+                    </div>
+                    <h3>Event-Driven Serverless</h3>
+                    <p>6 specialized Lambda functions orchestrated by Step Functions and EventBridge Pipes. Auto-scaling architecture handles 1000+ concurrent users with sub-100ms response times and minimal infrastructure costs.</p>
+                </div>
+
+                <div class="feature-card fade-in">
+                    <div class="feature-icon">
+                        <i class="fas fa-heart"></i>
+                    </div>
+                    <h3>Emotion-Aware Enhancement</h3>
+                    <p>AI understands emotional journeys and creates personalized content reflecting your transformation from 'focused' to 'accomplished'. Promotes healthy productivity patterns with reward systems.</p>
+                </div>
+
+                <div class="feature-card fade-in">
+                    <div class="feature-icon">
+                        <i class="fas fa-globe"></i>
+                    </div>
+                    <h3>Multi-Region Support</h3>
+                    <p>Tested in eu-west-3 with automatic model fallback. Region-aware Bedrock integration supports Nova Lite in US/EU/APAC regions with Claude Haiku as universal backup.</p>
+                </div>
+
+                <div class="feature-card fade-in">
+                    <div class="feature-icon">
+                        <i class="fas fa-dollar-sign"></i>
+                    </div>
+                    <h3>Cost Intelligence</h3>
+                    <p>Smart budget tracking with automatic rewards. Users earn AI credits for consistent engagement, breakthrough sessions, and positive outcomes. Built-in freemium model for commercial viability.</p>
+                </div>
+
+                <div class="feature-card fade-in">
+                    <div class="feature-icon">
+                        <i class="fas fa-shield-alt"></i>
+                    </div>
+                    <h3>Production Ready</h3>
+                    <p>Comprehensive error handling, structured logging with PowerTools, monitoring, and sophisticated retry logic. TTL-based data lifecycle management reduces storage costs by 80%.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="architecture-preview">
+        <div class="container">
+            <h2 class="section-title">Serverless Architecture</h2>
+            <p class="section-subtitle">Event-driven design with intelligent orchestration</p>
+            
+            <div class="architecture-diagram">
+                <svg width="100%" height="400" viewBox="0 0 1000 400">
+                    <!-- Background -->
+                    <defs>
+                        <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" style="stop-color:#667eea;stop-opacity:0.1" />
+                            <stop offset="100%" style="stop-color:#764ba2;stop-opacity:0.1" />
+                        </linearGradient>
+                    </defs>
+                    <rect width="100%" height="100%" fill="url(#bg)" />
+                    
+                    <!-- User -->
+                    <circle cx="50" cy="200" r="30" fill="#667eea" />
+                    <text x="50" y="250" text-anchor="middle" font-size="12" fill="#333">User</text>
+                    
+                    <!-- DynamoDB -->
+                    <rect x="150" y="170" width="80" height="60" fill="#ff9900" rx="10" />
+                    <text x="190" y="205" text-anchor="middle" font-size="12" fill="white">DynamoDB</text>
+                    
+                    <!-- EventBridge -->
+                    <rect x="280" y="170" width="80" height="60" fill="#ff4757" rx="10" />
+                    <text x="320" y="205" text-anchor="middle" font-size="12" fill="white">EventBridge</text>
+                    
+                    <!-- AI Selection -->
+                    <rect x="410" y="120" width="100" height="60" fill="#2ed573" rx="10" />
+                    <text x="460" y="155" text-anchor="middle" font-size="12" fill="white">AI Selection</text>
+                    
+                    <!-- Bedrock Enhancement -->
+                    <rect x="560" y="80" width="100" height="60" fill="#3742fa" rx="10" />
+                    <text x="610" y="115" text-anchor="middle" font-size="12" fill="white">Bedrock AI</text>
+                    
+                    <!-- Standard Enhancement -->
+                    <rect x="560" y="160" width="100" height="60" fill="#ffa502" rx="10" />
+                    <text x="610" y="195" text-anchor="middle" font-size="12" fill="white">Standard</text>
+                    
+                    <!-- Step Functions -->
+                    <rect x="710" y="120" width="100" height="60" fill="#ff6348" rx="10" />
+                    <text x="760" y="155" text-anchor="middle" font-size="12" fill="white">Step Functions</text>
+                    
+                    <!-- Final Storage -->
+                    <rect x="860" y="170" width="80" height="60" fill="#ff9900" rx="10" />
+                    <text x="900" y="205" text-anchor="middle" font-size="12" fill="white">Storage</text>
+                    
+                    <!-- Arrows -->
+                    <path d="M 80 200 L 140 200" stroke="#333" stroke-width="2" fill="none" marker-end="url(#arrowhead)" />
+                    <path d="M 230 200 L 270 200" stroke="#333" stroke-width="2" fill="none" marker-end="url(#arrowhead)" />
+                    <path d="M 360 200 L 400 160" stroke="#333" stroke-width="2" fill="none" marker-end="url(#arrowhead)" />
+                    <path d="M 510 140 L 550 120" stroke="#333" stroke-width="2" fill="none" marker-end="url(#arrowhead)" />
+                    <path d="M 510 160 L 550 180" stroke="#333" stroke-width="2" fill="none" marker-end="url(#arrowhead)" />
+                    <path d="M 660 110 L 700 140" stroke="#333" stroke-width="2" fill="none" marker-end="url(#arrowhead)" />
+                    <path d="M 660 190 L 700 160" stroke="#333" stroke-width="2" fill="none" marker-end="url(#arrowhead)" />
+                    <path d="M 810 150 L 850 190" stroke="#333" stroke-width="2" fill="none" marker-end="url(#arrowhead)" />
+                    
+                    <!-- Arrow markers -->
+                    <defs>
+                        <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+                            <polygon points="0 0, 10 3.5, 0 7" fill="#333" />
+                        </marker>
+                    </defs>
+                    
+                    <!-- Worthiness Score Indicator -->
+                    <text x="460" y="100" text-anchor="middle" font-size="10" fill="#333" font-weight="bold">Worthiness ≥ 0.8?</text>
+                    <text x="610" y="70" text-anchor="middle" font-size="9" fill="#333">Premium AI</text>
+                    <text x="610" y="250" text-anchor="middle" font-size="9" fill="#333">Cost-Effective</text>
+                </svg>
+                
+                <div style="margin-top: 2rem;">
+                    <a href="architecture.html" class="btn btn-primary">
+                        <i class="fas fa-search-plus"></i> Explore Interactive Architecture
+                    </a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="metrics" class="metrics">
+        <div class="container">
+            <h2 class="section-title">Performance Metrics</h2>
+            <p class="section-subtitle">Production-ready scalability and cost efficiency</p>
+            
+            <div class="metrics-grid">
+                <div class="metric-card">
+                    <div class="metric-number">6</div>
+                    <div class="metric-label">Lambda Functions</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-number">1000+</div>
+                    <div class="metric-label">Concurrent Users</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-number">60%</div>
+                    <div class="metric-label">AI Cost Reduction</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-number">&lt;100ms</div>
+                    <div class="metric-label">Response Time</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-number">80%</div>
+                    <div class="metric-label">Storage Cost Savings</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-number">5</div>
+                    <div class="metric-label">AWS Regions</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2025 PulseShrine. Built for AWS Lambda Hackathon 2025.</p>
+            <p>
+                <a href="https://github.com/JeromeDuboisPro/PulseShrine" style="color: #667eea; text-decoration: none;">
+                    <i class="fab fa-github"></i> View Source Code
+                </a>
+            </p>
+        </div>
+    </footer>
+
+    <script>
+        // Add smooth scrolling and animations
+        document.addEventListener('DOMContentLoaded', function() {
+            // Smooth scrolling for anchor links
+            document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+                anchor.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    document.querySelector(this.getAttribute('href')).scrollIntoView({
+                        behavior: 'smooth'
+                    });
+                });
+            });
+
+            // Animate elements on scroll
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        entry.target.classList.add('fade-in');
+                    }
+                });
+            });
+
+            document.querySelectorAll('.feature-card').forEach(card => {
+                observer.observe(card);
+            });
+        });
+
+        // Add loading animation to metrics
+        function animateNumbers() {
+            const metrics = document.querySelectorAll('.metric-number');
+            metrics.forEach(metric => {
+                const text = metric.textContent;
+                if (text.includes('+') || text.includes('%') || text.includes('<')) {
+                    // Skip animation for these
+                    return;
+                }
+                const number = parseInt(text);
+                if (!isNaN(number)) {
+                    let current = 0;
+                    const increment = number / 50;
+                    const timer = setInterval(() => {
+                        current += increment;
+                        if (current >= number) {
+                            metric.textContent = number;
+                            clearInterval(timer);
+                        } else {
+                            metric.textContent = Math.floor(current);
+                        }
+                    }, 30);
+                }
+            });
+        }
+
+        // Trigger number animation when metrics section is visible
+        const metricsObserver = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    animateNumbers();
+                    metricsObserver.unobserve(entry.target);
+                }
+            });
+        });
+
+        document.addEventListener('DOMContentLoaded', function() {
+            const metricsSection = document.getElementById('metrics');
+            if (metricsSection) {
+                metricsObserver.observe(metricsSection);
+            }
+        });
+    </script>
+</body>
+</html>

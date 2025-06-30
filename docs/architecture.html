@@ -1,0 +1,829 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PulseShrine Architecture - Interactive Diagrams</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+
+        header {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            padding: 1rem 0;
+            position: fixed;
+            width: 100%;
+            top: 0;
+            z-index: 1000;
+        }
+
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            color: white;
+            font-size: 1.8rem;
+            font-weight: bold;
+            text-decoration: none;
+        }
+
+        .nav-links {
+            display: flex;
+            list-style: none;
+            gap: 2rem;
+        }
+
+        .nav-links a {
+            color: white;
+            text-decoration: none;
+            font-weight: 500;
+            transition: color 0.3s;
+        }
+
+        .nav-links a:hover {
+            color: #ffd700;
+        }
+
+        .hero-section {
+            padding: 120px 0 40px;
+            text-align: center;
+            color: white;
+        }
+
+        .hero-section h1 {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .hero-section p {
+            font-size: 1.2rem;
+            opacity: 0.9;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .main-content {
+            background: white;
+            border-radius: 20px 20px 0 0;
+            margin-top: 2rem;
+            padding: 40px 0;
+            min-height: 100vh;
+        }
+
+        .section {
+            padding: 40px 0;
+            border-bottom: 1px solid #eee;
+        }
+
+        .section:last-child {
+            border-bottom: none;
+        }
+
+        .section-title {
+            font-size: 2.5rem;
+            text-align: center;
+            margin-bottom: 1rem;
+            color: #333;
+        }
+
+        .section-subtitle {
+            text-align: center;
+            font-size: 1.2rem;
+            opacity: 0.7;
+            margin-bottom: 3rem;
+        }
+
+        .diagram-container {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 2rem;
+            margin: 2rem 0;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .diagram-controls {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .control-btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 0 5px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .control-btn:hover {
+            background: #5a6fd8;
+            transform: translateY(-2px);
+        }
+
+        .control-btn.active {
+            background: #ff6b6b;
+        }
+
+        .architecture-svg {
+            width: 100%;
+            height: 500px;
+            background: white;
+            border-radius: 10px;
+            border: 2px solid #e9ecef;
+        }
+
+        .code-snippet {
+            background: #2d3748;
+            color: #e2e8f0;
+            padding: 1.5rem;
+            border-radius: 10px;
+            margin: 2rem 0;
+            font-family: 'Courier New', monospace;
+            overflow-x: auto;
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 2rem;
+            margin-top: 2rem;
+        }
+
+        .metric-card {
+            background: white;
+            padding: 2rem;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            text-align: center;
+            border-left: 4px solid #667eea;
+        }
+
+        .metric-value {
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 0.5rem;
+        }
+
+        .metric-label {
+            font-size: 1rem;
+            color: #666;
+            margin-bottom: 0.5rem;
+        }
+
+        .metric-description {
+            font-size: 0.9rem;
+            color: #888;
+        }
+
+        .tech-stack-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            margin-top: 2rem;
+        }
+
+        .tech-card {
+            background: white;
+            padding: 2rem;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+
+        .tech-icon {
+            font-size: 2.5rem;
+            color: #667eea;
+            margin-bottom: 1rem;
+        }
+
+        .tech-title {
+            font-size: 1.3rem;
+            font-weight: bold;
+            margin-bottom: 1rem;
+            color: #333;
+        }
+
+        .flow-animation {
+            animation: flowPulse 3s infinite;
+        }
+
+        @keyframes flowPulse {
+            0%, 100% { opacity: 0.3; }
+            50% { opacity: 1; }
+        }
+
+        .data-flow {
+            animation: dataFlow 4s infinite linear;
+        }
+
+        @keyframes dataFlow {
+            0% { stroke-dashoffset: 100; }
+            100% { stroke-dashoffset: 0; }
+        }
+
+        .highlight-box {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 2rem;
+            border-radius: 15px;
+            margin: 2rem 0;
+        }
+
+        .highlight-box h3 {
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+        }
+
+        @media (max-width: 768px) {
+            .hero-section h1 {
+                font-size: 2rem;
+            }
+            
+            .nav-links {
+                display: none;
+            }
+            
+            .section-title {
+                font-size: 2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <div class="header-content">
+                <a href="index.html" class="logo">
+                    <i class="fas fa-heart-pulse"></i> PulseShrine
+                </a>
+                <nav>
+                    <ul class="nav-links">
+                        <li><a href="index.html">Home</a></li>
+                        <li><a href="#overview">Overview</a></li>
+                        <li><a href="#ai-selection">AI Selection</a></li>
+                        <li><a href="#data-flow">Data Flow</a></li>
+                        <li><a href="#technical-specs">Specs</a></li>
+                    </ul>
+                </nav>
+            </div>
+        </div>
+    </header>
+
+    <section class="hero-section">
+        <div class="container">
+            <h1>Interactive Architecture</h1>
+            <p>Explore PulseShrine's sophisticated serverless architecture with intelligent AI selection and event-driven orchestration</p>
+        </div>
+    </section>
+
+    <div class="main-content">
+        <div class="container">
+            
+            <!-- Architecture Overview -->
+            <section id="overview" class="section">
+                <h2 class="section-title">System Overview</h2>
+                <p class="section-subtitle">6 specialized Lambda functions orchestrated by event-driven patterns</p>
+                
+                <div class="diagram-container">
+                    <div class="diagram-controls">
+                        <button class="control-btn active" onclick="showOverview()">Full System</button>
+                        <button class="control-btn" onclick="showAnimation()">Show Data Flow</button>
+                        <button class="control-btn" onclick="resetAnimation()">Reset</button>
+                    </div>
+                    
+                    <svg class="architecture-svg" id="overview-diagram" viewBox="0 0 1200 400">
+                        <!-- Background -->
+                        <defs>
+                            <linearGradient id="bg1" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <stop offset="0%" style="stop-color:#667eea;stop-opacity:0.05" />
+                                <stop offset="100%" style="stop-color:#764ba2;stop-opacity:0.05" />
+                            </linearGradient>
+                            <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+                                <polygon points="0 0, 10 3.5, 0 7" fill="#333" />
+                            </marker>
+                        </defs>
+                        <rect width="100%" height="100%" fill="url(#bg1)" />
+                        
+                        <!-- User Interface -->
+                        <g id="user-interface">
+                            <rect x="50" y="150" width="120" height="80" fill="#4299e1" rx="10" />
+                            <text x="110" y="185" text-anchor="middle" font-size="14" fill="white" font-weight="bold">React Frontend</text>
+                            <text x="110" y="205" text-anchor="middle" font-size="12" fill="white">User Interface</text>
+                        </g>
+                        
+                        <!-- API Gateway -->
+                        <g id="api-gateway">
+                            <rect x="220" y="150" width="100" height="80" fill="#38a169" rx="10" />
+                            <text x="270" y="185" text-anchor="middle" font-size="14" fill="white" font-weight="bold">API Gateway</text>
+                            <text x="270" y="205" text-anchor="middle" font-size="12" fill="white">REST API</text>
+                        </g>
+                        
+                        <!-- Lambda Functions -->
+                        <g id="lambda-functions">
+                            <rect x="370" y="80" width="100" height="60" fill="#ed8936" rx="8" />
+                            <text x="420" y="115" text-anchor="middle" font-size="12" fill="white" font-weight="bold">Start/Stop API</text>
+                            
+                            <rect x="370" y="160" width="100" height="60" fill="#ed8936" rx="8" />
+                            <text x="420" y="195" text-anchor="middle" font-size="12" fill="white" font-weight="bold">Get Pulses API</text>
+                            
+                            <rect x="370" y="240" width="100" height="60" fill="#ed8936" rx="8" />
+                            <text x="420" y="275" text-anchor="middle" font-size="12" fill="white" font-weight="bold">Ingested API</text>
+                        </g>
+                        
+                        <!-- DynamoDB Tables -->
+                        <g id="dynamodb-tables">
+                            <rect x="520" y="80" width="100" height="60" fill="#d69e2e" rx="8" />
+                            <text x="570" y="115" text-anchor="middle" font-size="12" fill="white" font-weight="bold">Start Pulse</text>
+                            
+                            <rect x="520" y="160" width="100" height="60" fill="#d69e2e" rx="8" />
+                            <text x="570" y="195" text-anchor="middle" font-size="12" fill="white" font-weight="bold">Stop Pulse</text>
+                            
+                            <rect x="520" y="240" width="100" height="60" fill="#d69e2e" rx="8" />
+                            <text x="570" y="275" text-anchor="middle" font-size="12" fill="white" font-weight="bold">Ingested</text>
+                        </g>
+                        
+                        <!-- Event Processing -->
+                        <g id="event-processing">
+                            <rect x="670" y="140" width="100" height="60" fill="#e53e3e" rx="8" />
+                            <text x="720" y="170" text-anchor="middle" font-size="12" fill="white" font-weight="bold">EventBridge</text>
+                            <text x="720" y="185" text-anchor="middle" font-size="11" fill="white">Pipes</text>
+                            
+                            <rect x="820" y="100" width="100" height="60" fill="#805ad5" rx="8" />
+                            <text x="870" y="135" text-anchor="middle" font-size="12" fill="white" font-weight="bold">AI Selection</text>
+                            
+                            <rect x="820" y="180" width="100" height="60" fill="#805ad5" rx="8" />
+                            <text x="870" y="215" text-anchor="middle" font-size="12" fill="white" font-weight="bold">Enhancement</text>
+                        </g>
+                        
+                        <!-- AI Services -->
+                        <g id="ai-services">
+                            <rect x="970" y="140" width="100" height="60" fill="#3182ce" rx="8" />
+                            <text x="1020" y="170" text-anchor="middle" font-size="12" fill="white" font-weight="bold">Bedrock AI</text>
+                            <text x="1020" y="185" text-anchor="middle" font-size="11" fill="white">Nova/Claude</text>
+                        </g>
+                        
+                        <!-- Data Flow Arrows -->
+                        <g id="data-arrows">
+                            <path d="M 170 190 L 210 190" stroke="#333" stroke-width="2" fill="none" marker-end="url(#arrowhead)" stroke-dasharray="5,5" class="data-flow" />
+                            <path d="M 320 170 L 360 130" stroke="#333" stroke-width="2" fill="none" marker-end="url(#arrowhead)" stroke-dasharray="5,5" class="data-flow" />
+                            <path d="M 320 190 L 360 190" stroke="#333" stroke-width="2" fill="none" marker-end="url(#arrowhead)" stroke-dasharray="5,5" class="data-flow" />
+                            <path d="M 320 210 L 360 270" stroke="#333" stroke-width="2" fill="none" marker-end="url(#arrowhead)" stroke-dasharray="5,5" class="data-flow" />
+                            
+                            <path d="M 470 110 L 510 110" stroke="#333" stroke-width="2" fill="none" marker-end="url(#arrowhead)" stroke-dasharray="5,5" class="data-flow" />
+                            <path d="M 470 190 L 510 190" stroke="#333" stroke-width="2" fill="none" marker-end="url(#arrowhead)" stroke-dasharray="5,5" class="data-flow" />
+                            <path d="M 470 270 L 510 270" stroke="#333" stroke-width="2" fill="none" marker-end="url(#arrowhead)" stroke-dasharray="5,5" class="data-flow" />
+                            
+                            <path d="M 620 180 L 660 170" stroke="#333" stroke-width="2" fill="none" marker-end="url(#arrowhead)" stroke-dasharray="5,5" class="data-flow" />
+                            <path d="M 770 150 L 810 130" stroke="#333" stroke-width="2" fill="none" marker-end="url(#arrowhead)" stroke-dasharray="5,5" class="data-flow" />
+                            <path d="M 770 190 L 810 210" stroke="#333" stroke-width="2" fill="none" marker-end="url(#arrowhead)" stroke-dasharray="5,5" class="data-flow" />
+                            
+                            <path d="M 920 130 L 960 160" stroke="#333" stroke-width="2" fill="none" marker-end="url(#arrowhead)" stroke-dasharray="5,5" class="data-flow" />
+                            <path d="M 920 210 L 960 180" stroke="#333" stroke-width="2" fill="none" marker-end="url(#arrowhead)" stroke-dasharray="5,5" class="data-flow" />
+                        </g>
+                        
+                        <!-- Layer Labels -->
+                        <text x="60" y="50" font-size="14" font-weight="bold" fill="#667eea">User Layer</text>
+                        <text x="220" y="50" font-size="14" font-weight="bold" fill="#667eea">API Layer</text>
+                        <text x="370" y="50" font-size="14" font-weight="bold" fill="#667eea">Compute Layer</text>
+                        <text x="520" y="50" font-size="14" font-weight="bold" fill="#667eea">Data Layer</text>
+                        <text x="670" y="50" font-size="14" font-weight="bold" fill="#667eea">Event Layer</text>
+                        <text x="820" y="50" font-size="14" font-weight="bold" fill="#667eea">Processing</text>
+                        <text x="970" y="50" font-size="14" font-weight="bold" fill="#667eea">AI Layer</text>
+                    </svg>
+                </div>
+                
+                <div class="highlight-box">
+                    <h3><i class="fas fa-lightbulb"></i> Key Innovation: Intelligent AI Selection</h3>
+                    <p>Unlike traditional systems that use AI for every request, PulseShrine implements a sophisticated worthiness algorithm that analyzes content quality, duration, and emotional journey to make cost-effective AI enhancement decisions. This reduces AI costs by 60% while ensuring valuable sessions receive premium treatment.</p>
+                </div>
+            </section>
+
+            <!-- AI Selection Algorithm -->
+            <section id="ai-selection" class="section">
+                <h2 class="section-title">AI Selection Algorithm</h2>
+                <p class="section-subtitle">Multi-dimensional worthiness calculation with 750+ lines of sophisticated logic</p>
+                
+                <div class="diagram-container">
+                    <svg class="architecture-svg" viewBox="0 0 1000 400">
+                        <!-- Algorithm Flow -->
+                        <defs>
+                            <linearGradient id="gradient1" x1="0%" y1="0%" x2="100%" y2="0%">
+                                <stop offset="0%" style="stop-color:#667eea" />
+                                <stop offset="100%" style="stop-color:#764ba2" />
+                            </linearGradient>
+                        </defs>
+                        
+                        <!-- Input Data -->
+                        <rect x="50" y="50" width="150" height="80" fill="#4299e1" rx="10" />
+                        <text x="125" y="85" text-anchor="middle" font-size="14" fill="white" font-weight="bold">Pulse Data</text>
+                        <text x="125" y="105" text-anchor="middle" font-size="11" fill="white">Intent + Reflection</text>
+                        <text x="125" y="120" text-anchor="middle" font-size="11" fill="white">Duration + Emotions</text>
+                        
+                        <!-- Worthiness Components -->
+                        <rect x="250" y="30" width="120" height="50" fill="#38a169" rx="8" />
+                        <text x="310" y="55" text-anchor="middle" font-size="12" fill="white" font-weight="bold">Length Score</text>
+                        <text x="310" y="70" text-anchor="middle" font-size="10" fill="white">Weight: 40%</text>
+                        
+                        <rect x="250" y="90" width="120" height="50" fill="#ed8936" rx="8" />
+                        <text x="310" y="115" text-anchor="middle" font-size="12" fill="white" font-weight="bold">Duration Score</text>
+                        <text x="310" y="130" text-anchor="middle" font-size="10" fill="white">Weight: 30%</text>
+                        
+                        <rect x="250" y="150" width="120" height="50" fill="#805ad5" rx="8" />
+                        <text x="310" y="175" text-anchor="middle" font-size="12" fill="white" font-weight="bold">Depth Score</text>
+                        <text x="310" y="190" text-anchor="middle" font-size="10" fill="white">Weight: 20%</text>
+                        
+                        <rect x="250" y="210" width="120" height="50" fill="#e53e3e" rx="8" />
+                        <text x="310" y="235" text-anchor="middle" font-size="12" fill="white" font-weight="bold">Frequency Score</text>
+                        <text x="310" y="250" text-anchor="middle" font-size="10" fill="white">Weight: 10%</text>
+                        
+                        <!-- Calculation -->
+                        <rect x="420" y="120" width="150" height="80" fill="url(#gradient1)" rx="10" />
+                        <text x="495" y="150" text-anchor="middle" font-size="14" fill="white" font-weight="bold">Worthiness</text>
+                        <text x="495" y="170" text-anchor="middle" font-size="14" fill="white" font-weight="bold">Calculator</text>
+                        <text x="495" y="190" text-anchor="middle" font-size="11" fill="white">0.0 - 1.0 scale</text>
+                        
+                        <!-- Decision Logic -->
+                        <rect x="620" y="50" width="140" height="60" fill="#68d391" rx="8" />
+                        <text x="690" y="80" text-anchor="middle" font-size="12" fill="white" font-weight="bold">≥ 0.8 Exceptional</text>
+                        <text x="690" y="95" text-anchor="middle" font-size="11" fill="white">Guaranteed AI</text>
+                        
+                        <rect x="620" y="120" width="140" height="60" fill="#fbb040" rx="8" />
+                        <text x="690" y="150" text-anchor="middle" font-size="12" fill="white" font-weight="bold">0.4-0.8 Good</text>
+                        <text x="690" y="165" text-anchor="middle" font-size="11" fill="white">Probabilistic AI</text>
+                        
+                        <rect x="620" y="190" width="140" height="60" fill="#fc8181" rx="8" />
+                        <text x="690" y="220" text-anchor="middle" font-size="12" fill="white" font-weight="bold">&lt; 0.4 Low</text>
+                        <text x="690" y="235" text-anchor="middle" font-size="11" fill="white">Standard Only</text>
+                        
+                        <!-- Final Output -->
+                        <rect x="800" y="120" width="120" height="80" fill="#667eea" rx="10" />
+                        <text x="860" y="150" text-anchor="middle" font-size="14" fill="white" font-weight="bold">Enhancement</text>
+                        <text x="860" y="170" text-anchor="middle" font-size="14" fill="white" font-weight="bold">Decision</text>
+                        <text x="860" y="185" text-anchor="middle" font-size="11" fill="white">AI or Standard</text>
+                        
+                        <!-- Arrows -->
+                        <path d="M 200 90 L 240 60" stroke="#333" stroke-width="2" fill="none" marker-end="url(#arrowhead)" />
+                        <path d="M 200 90 L 240 115" stroke="#333" stroke-width="2" fill="none" marker-end="url(#arrowhead)" />
+                        <path d="M 200 90 L 240 175" stroke="#333" stroke-width="2" fill="none" marker-end="url(#arrowhead)" />
+                        <path d="M 200 90 L 240 235" stroke="#333" stroke-width="2" fill="none" marker-end="url(#arrowhead)" />
+                        
+                        <path d="M 370 140 L 410 160" stroke="#333" stroke-width="2" fill="none" marker-end="url(#arrowhead)" />
+                        
+                        <path d="M 570 140 L 610 80" stroke="#333" stroke-width="2" fill="none" marker-end="url(#arrowhead)" />
+                        <path d="M 570 160 L 610 150" stroke="#333" stroke-width="2" fill="none" marker-end="url(#arrowhead)" />
+                        <path d="M 570 180 L 610 220" stroke="#333" stroke-width="2" fill="none" marker-end="url(#arrowhead)" />
+                        
+                        <path d="M 760 150 L 790 160" stroke="#333" stroke-width="2" fill="none" marker-end="url(#arrowhead)" />
+                        
+                        <!-- Cost Savings Indicator -->
+                        <text x="500" y="350" text-anchor="middle" font-size="16" font-weight="bold" fill="#667eea">60% Cost Reduction vs. Always-AI Approach</text>
+                    </svg>
+                </div>
+                
+                <div class="code-snippet">
+<pre><code># Sophisticated AI Worthiness Calculation
+def calculate_worthiness(self, pulse_data: Dict[str, Any], user_id: str) -> float:
+    # Extract key data with actual time calculations
+    intent = pulse_data.get("intent", "")
+    reflection = pulse_data.get("reflection", "")
+    actual_duration = self._calculate_actual_duration(pulse_data)
+    intent_emotion = pulse_data.get("intent_emotion", "")
+    reflection_emotion = pulse_data.get("reflection_emotion", "")
+
+    # Multi-dimensional scoring
+    length_score = self._calculate_length_score(intent, reflection)      # 40%
+    duration_score = self._calculate_duration_score(actual_duration)     # 30%
+    depth_score = self._calculate_reflection_depth(                      # 20%
+        intent, reflection, intent_emotion, reflection_emotion
+    )
+    frequency_score = self._calculate_frequency_bonus(user_id)           # 10%
+
+    # Weighted calculation
+    worthiness = (
+        length_score * 0.4 +
+        duration_score * 0.3 +
+        depth_score * 0.2 +
+        frequency_score * 0.1
+    )
+
+    return min(1.0, worthiness)  # Cap at 1.0</code></pre>
+                </div>
+            </section>
+
+            <!-- Data Flow Animation -->
+            <section id="data-flow" class="section">
+                <h2 class="section-title">Event-Driven Data Flow</h2>
+                <p class="section-subtitle">Real-time processing with EventBridge Pipes and Step Functions</p>
+                
+                <div class="diagram-container">
+                    <div class="diagram-controls">
+                        <button class="control-btn" onclick="startDataFlow()">Start Animation</button>
+                        <button class="control-btn" onclick="pauseDataFlow()">Pause</button>
+                        <button class="control-btn" onclick="resetDataFlow()">Reset</button>
+                    </div>
+                    
+                    <svg class="architecture-svg" id="data-flow-diagram" viewBox="0 0 1200 300">
+                        <!-- Pipeline Steps -->
+                        <g id="pipeline-steps">
+                            <circle cx="100" cy="150" r="40" fill="#4299e1" />
+                            <text x="100" y="155" text-anchor="middle" font-size="12" fill="white" font-weight="bold">User</text>
+                            <text x="100" y="200" text-anchor="middle" font-size="10" fill="#333">Completes Pulse</text>
+                            
+                            <rect x="200" y="120" width="80" height="60" fill="#d69e2e" rx="8" />
+                            <text x="240" y="155" text-anchor="middle" font-size="12" fill="white" font-weight="bold">DynamoDB</text>
+                            <text x="240" y="200" text-anchor="middle" font-size="10" fill="#333">Stream Event</text>
+                            
+                            <rect x="320" y="120" width="80" height="60" fill="#e53e3e" rx="8" />
+                            <text x="360" y="155" text-anchor="middle" font-size="12" fill="white" font-weight="bold">EventBridge</text>
+                            <text x="360" y="200" text-anchor="middle" font-size="10" fill="#333">Pipes Trigger</text>
+                            
+                            <rect x="440" y="120" width="80" height="60" fill="#805ad5" rx="8" />
+                            <text x="480" y="155" text-anchor="middle" font-size="12" fill="white" font-weight="bold">AI Selection</text>
+                            <text x="480" y="200" text-anchor="middle" font-size="10" fill="#333">Worthiness Calc</text>
+                            
+                            <rect x="560" y="80" width="80" height="60" fill="#3182ce" rx="8" />
+                            <text x="600" y="115" text-anchor="middle" font-size="12" fill="white" font-weight="bold">Bedrock AI</text>
+                            <text x="600" y="160" text-anchor="middle" font-size="10" fill="#333">Premium</text>
+                            
+                            <rect x="560" y="160" width="80" height="60" fill="#38a169" rx="8" />
+                            <text x="600" y="195" text-anchor="middle" font-size="12" fill="white" font-weight="bold">Standard</text>
+                            <text x="600" y="240" text-anchor="middle" font-size="10" fill="#333">Rule-based</text>
+                            
+                            <rect x="680" y="120" width="80" height="60" fill="#ed8936" rx="8" />
+                            <text x="720" y="155" text-anchor="middle" font-size="12" fill="white" font-weight="bold">Step Func</text>
+                            <text x="720" y="200" text-anchor="middle" font-size="10" fill="#333">Orchestration</text>
+                            
+                            <rect x="800" y="120" width="80" height="60" fill="#d69e2e" rx="8" />
+                            <text x="840" y="155" text-anchor="middle" font-size="12" fill="white" font-weight="bold">Ingest</text>
+                            <text x="840" y="200" text-anchor="middle" font-size="10" fill="#333">Final Storage</text>
+                        </g>
+                        
+                        <!-- Animated Data Packets -->
+                        <g id="data-packets">
+                            <circle id="packet1" cx="100" cy="150" r="8" fill="#ff6b6b" opacity="0">
+                                <animate attributeName="opacity" values="0;1;1;0" dur="4s" repeatCount="indefinite" />
+                            </circle>
+                            <circle id="packet2" cx="240" cy="150" r="8" fill="#ff6b6b" opacity="0">
+                                <animate attributeName="opacity" values="0;0;1;1;0" dur="4s" repeatCount="indefinite" />
+                            </circle>
+                            <circle id="packet3" cx="360" cy="150" r="8" fill="#ff6b6b" opacity="0">
+                                <animate attributeName="opacity" values="0;0;0;1;1;0" dur="4s" repeatCount="indefinite" />
+                            </circle>
+                        </g>
+                        
+                        <!-- Flow Arrows -->
+                        <g id="flow-arrows">
+                            <path d="M 140 150 L 190 150" stroke="#333" stroke-width="3" fill="none" marker-end="url(#arrowhead)" stroke-dasharray="8,4" class="flow-animation" />
+                            <path d="M 280 150 L 310 150" stroke="#333" stroke-width="3" fill="none" marker-end="url(#arrowhead)" stroke-dasharray="8,4" class="flow-animation" />
+                            <path d="M 400 150 L 430 150" stroke="#333" stroke-width="3" fill="none" marker-end="url(#arrowhead)" stroke-dasharray="8,4" class="flow-animation" />
+                            <path d="M 520 140 L 550 120" stroke="#333" stroke-width="3" fill="none" marker-end="url(#arrowhead)" stroke-dasharray="8,4" class="flow-animation" />
+                            <path d="M 520 160 L 550 180" stroke="#333" stroke-width="3" fill="none" marker-end="url(#arrowhead)" stroke-dasharray="8,4" class="flow-animation" />
+                            <path d="M 640 110 L 670 140" stroke="#333" stroke-width="3" fill="none" marker-end="url(#arrowhead)" stroke-dasharray="8,4" class="flow-animation" />
+                            <path d="M 640 190 L 670 160" stroke="#333" stroke-width="3" fill="none" marker-end="url(#arrowhead)" stroke-dasharray="8,4" class="flow-animation" />
+                            <path d="M 760 150 L 790 150" stroke="#333" stroke-width="3" fill="none" marker-end="url(#arrowhead)" stroke-dasharray="8,4" class="flow-animation" />
+                        </g>
+                        
+                        <!-- Performance Metrics -->
+                        <text x="600" y="50" text-anchor="middle" font-size="14" font-weight="bold" fill="#667eea">Processing Time: 100-500ms</text>
+                        <text x="600" y="270" text-anchor="middle" font-size="14" font-weight="bold" fill="#667eea">Batch Size: 1 (Immediate Processing)</text>
+                    </svg>
+                </div>
+            </section>
+
+            <!-- Technical Specifications -->
+            <section id="technical-specs" class="section">
+                <h2 class="section-title">Technical Specifications</h2>
+                <p class="section-subtitle">Production-ready serverless architecture with cost optimization</p>
+                
+                <div class="tech-stack-grid">
+                    <div class="tech-card">
+                        <div class="tech-icon">
+                            <i class="fas fa-code"></i>
+                        </div>
+                        <div class="tech-title">Lambda Functions</div>
+                        <p><strong>6 specialized functions</strong> with ARM64 architecture for cost efficiency</p>
+                        <ul style="margin-top: 1rem; padding-left: 1rem;">
+                            <li>AI Selection: 1024MB, 30s timeout</li>
+                            <li>Bedrock Enhancement: 1024MB, 120s</li>
+                            <li>Standard Enhancement: 512MB, 30s</li>
+                            <li>Pure Ingest: 256MB, 10s</li>
+                            <li>API Handlers: 512MB, 15s</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="tech-card">
+                        <div class="tech-icon">
+                            <i class="fas fa-database"></i>
+                        </div>
+                        <div class="tech-title">DynamoDB Design</div>
+                        <p><strong>3-table architecture</strong> with TTL-based cost optimization</p>
+                        <ul style="margin-top: 1rem; padding-left: 1rem;">
+                            <li>Start Pulse: TTL 4 hours</li>
+                            <li>Stop Pulse: TTL 7 days</li>
+                            <li>Ingested: Permanent storage</li>
+                            <li>On-demand billing mode</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="tech-card">
+                        <div class="tech-icon">
+                            <i class="fas fa-brain"></i>
+                        </div>
+                        <div class="tech-title">AI Integration</div>
+                        <p><strong>Multi-model Bedrock</strong> with region-aware selection</p>
+                        <ul style="margin-top: 1rem; padding-left: 1rem;">
+                            <li>Nova Lite (preferred): $0.06/1M tokens</li>
+                            <li>Claude Haiku (fallback): $0.25/1M tokens</li>
+                            <li>Automatic model availability testing</li>
+                            <li>Cost estimation: 0.01-2.0¢ per enhancement</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="tech-card">
+                        <div class="tech-icon">
+                            <i class="fas fa-stream"></i>
+                        </div>
+                        <div class="tech-title">Event Processing</div>
+                        <p><strong>EventBridge Pipes</strong> with Step Functions orchestration</p>
+                        <ul style="margin-top: 1rem; padding-left: 1rem;">
+                            <li>Express workflows for speed</li>
+                            <li>Batch size: 1 (immediate processing)</li>
+                            <li>DLQ + 3 retries error handling</li>
+                            <li>25K executions/second capacity</li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <div class="metrics-grid">
+                    <div class="metric-card">
+                        <div class="metric-value">1000+</div>
+                        <div class="metric-label">Concurrent Users</div>
+                        <div class="metric-description">Auto-scaling Lambda functions</div>
+                    </div>
+                    
+                    <div class="metric-card">
+                        <div class="metric-value">&lt;100ms</div>
+                        <div class="metric-label">API Response Time</div>
+                        <div class="metric-description">ARM64 + optimized layers</div>
+                    </div>
+                    
+                    <div class="metric-card">
+                        <div class="metric-value">60%</div>
+                        <div class="metric-label">AI Cost Reduction</div>
+                        <div class="metric-description">vs always-AI approach</div>
+                    </div>
+                    
+                    <div class="metric-card">
+                        <div class="metric-value">80%</div>
+                        <div class="metric-label">Storage Savings</div>
+                        <div class="metric-description">TTL-based lifecycle</div>
+                    </div>
+                    
+                    <div class="metric-card">
+                        <div class="metric-value">5</div>
+                        <div class="metric-label">AWS Regions</div>
+                        <div class="metric-description">Tested compatibility</div>
+                    </div>
+                    
+                    <div class="metric-card">
+                        <div class="metric-value">99.9%</div>
+                        <div class="metric-label">Availability SLA</div>
+                        <div class="metric-description">Serverless architecture</div>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <script>
+        // Animation control functions
+        function showOverview() {
+            document.querySelectorAll('.control-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+            // Reset all animations
+            resetAnimation();
+        }
+
+        function showAnimation() {
+            document.querySelectorAll('.control-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+            startDataFlowAnimation();
+        }
+
+        function resetAnimation() {
+            const arrows = document.querySelectorAll('.data-flow');
+            arrows.forEach(arrow => {
+                arrow.style.animationPlayState = 'paused';
+                arrow.style.strokeDashoffset = '100';
+            });
+            
+            const pulseElements = document.querySelectorAll('.flow-animation');
+            pulseElements.forEach(element => {
+                element.style.animationPlayState = 'paused';
+            });
+        }
+
+        function startDataFlowAnimation() {
+            const arrows = document.querySelectorAll('.data-flow');
+            arrows.forEach(arrow => {
+                arrow.style.animationPlayState = 'running';
+            });
+            
+            const pulseElements = document.querySelectorAll('.flow-animation');
+            pulseElements.forEach(element => {
+                element.style.animationPlayState = 'running';
+            });
+        }
+
+        function startDataFlow() {
+            startDataFlowAnimation();
+        }
+
+        function pauseDataFlow() {
+            const arrows = document.querySelectorAll('.data-flow');
+            arrows.forEach(arrow => {
+                arrow.style.animationPlayState = 'paused';
+            });
+            
+            const pulseElements = document.querySelectorAll('.flow-animation');
+            pulseElements.forEach(element => {
+                element.style.animationPlayState = 'paused';
+            });
+        }
+
+        function resetDataFlow() {
+            resetAnimation();
+        }
+
+        // Smooth scrolling for navigation
+        document.addEventListener('DOMContentLoaded', function() {
+            document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+                anchor.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    const target = document.querySelector(this.getAttribute('href'));
+                    if (target) {
+                        target.scrollIntoView({
+                            behavior: 'smooth',
+                            block: 'start'
+                        });
+                    }
+                });
+            });
+
+            // Start with paused animation
+            resetAnimation();
+        });
+
+        // Intersection Observer for animations
+        const observerOptions = {
+            threshold: 0.3,
+            rootMargin: '0px 0px -50px 0px'
+        };
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.style.opacity = '1';
+                    entry.target.style.transform = 'translateY(0)';
+                }
+            });
+        }, observerOptions);
+
+        // Observe all sections
+        document.querySelectorAll('.section').forEach(section => {
+            section.style.opacity = '0';
+            section.style.transform = 'translateY(30px)';
+            section.style.transition = 'opacity 0.6s ease, transform 0.6s ease';
+            observer.observe(section);
+        });
+    </script>
+</body>
+</html>
