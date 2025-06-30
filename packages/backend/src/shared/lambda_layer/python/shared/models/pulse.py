@@ -103,8 +103,8 @@ class StopPulse(PulseBase):
     @cached_property
     def actual_duration_seconds(self) -> int:
         actual_duration = int((self.stopped_at_dt - self.start_time_dt).total_seconds())
-        # Return the minimum of actual duration and planned duration
-        return min(actual_duration, self.duration_seconds)
+        # Return actual elapsed time (what user actually spent working)
+        return actual_duration
 
 
 

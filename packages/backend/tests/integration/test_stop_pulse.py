@@ -3,8 +3,8 @@ from moto import mock_aws
 
 # Your pulse creation code here (from previous artifact)
 from shared.models.pulse import StartPulse
-from src.handlers.api.start_pulse.services import start_pulse
-from src.handlers.api.stop_pulse.services import stop_pulse
+from src.handlers.api.start_pulse.start_pulse.services import start_pulse
+from src.handlers.api.stop_pulse.stop_pulse.services import stop_pulse
 from tests.fixtures.ddb import create_start_pulse_table, create_stop_pulse_table
 
 

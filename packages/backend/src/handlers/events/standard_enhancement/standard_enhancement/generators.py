@@ -1,7 +1,7 @@
 import random
 from typing import List
 
-from standard_enhancement.data import IntensityLevels, IntentData, SentimentAdjectives
+from .data import IntensityLevels, IntentData, SentimentAdjectives
 from shared.models.pulse import StopPulse
 import logging
 

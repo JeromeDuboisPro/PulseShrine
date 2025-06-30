@@ -3,7 +3,7 @@ from aws_lambda_powertools.utilities.typing import LambdaContext
 from typing import Dict, Any
 
 from shared.models.pulse import StopPulse
-from standard_enhancement.generators import PulseTitleGenerator
+from .generators import PulseTitleGenerator
 
 # Initialize the logger
 logger = Logger()

@@ -223,9 +223,8 @@ class WorthinessCalculator:
             # Calculate actual elapsed time
             actual_duration = int((stop_dt - start_dt).total_seconds())
             
-            # Cap at planned duration (user can't exceed original plan)
-            planned_duration = pulse_data.get("duration_seconds", actual_duration)
-            return min(actual_duration, planned_duration)
+            # Use actual elapsed time (what user actually spent working)
+            return actual_duration
             
         except Exception as e:
             logger.warning(f"Error calculating actual duration: {e}, using duration_seconds fallback")

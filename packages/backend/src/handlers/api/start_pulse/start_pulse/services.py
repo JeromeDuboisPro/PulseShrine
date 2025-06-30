@@ -4,7 +4,7 @@ import uuid
 from shared.models.pulse import PulseCreationError, StartPulse
 from shared.services.aws import get_ddb_table
 from botocore.exceptions import BotoCoreError, ClientError
-from start_pulse.models import PulseCreationErrorAlreadyPresent
+from .models import PulseCreationErrorAlreadyPresent
 import logging
 
 logger = logging.getLogger(__name__)
