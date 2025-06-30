@@ -1,0 +1,6 @@
+# AWS Lambda Powertools, X-Ray SDK, boto3, and pydantic provided by layers
+# Only additional dependencies needed:
+textblob
+emoji
+fuzzywuzzy
+python-Levenshtein

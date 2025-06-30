@@ -7,12 +7,15 @@ from functools import cache
 
 def get_region_name() -> str:
     """
-    Get the AWS region name from the environment variable or default to 'us-east-1'.
+    Get the AWS region name from environment variable.
+    Uses AWS_REGION if set, otherwise lets boto3 use its default region resolution.
 
     Returns:
-        str: The AWS region name.
+        str: The AWS region name or None to let boto3 handle region resolution.
     """
-    return os.getenv("AWS_REGION", "eu-west-3")
+    # Let boto3 handle region resolution if AWS_REGION is not explicitly set
+    # This will use AWS credentials, config files, instance metadata, etc.
+    return os.getenv("AWS_REGION")
 
 
 @cache
@@ -23,7 +26,12 @@ def get_dynamodb_resource() -> ServiceResource:
     Returns:
         boto3.resources.base.ServiceResource: The DynamoDB resource.
     """
-    return boto3.resource("dynamodb", region_name=get_region_name())
+    region = get_region_name()
+    if region:
+        return boto3.resource("dynamodb", region_name=region)
+    else:
+        # Let boto3 use default region resolution
+        return boto3.resource("dynamodb")
 
 
 @cache
