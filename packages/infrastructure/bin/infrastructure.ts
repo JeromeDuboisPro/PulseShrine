@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import * as cdk from 'aws-cdk-lib';
 import { ApiGatewayStack } from '../lib/api-gateway-stack';
+import { AuthStack } from '../lib/auth-stack';
 import { InfrastructureStack } from '../lib/infrastructure-stack';
 import { LambdaStack } from '../lib/lambda-stack';
 import { SfnStack } from '../lib/sfn-stack';
@@ -11,6 +12,15 @@ const infraStack = new InfrastructureStack(app, 'InfrastructureStack', {
     account: process.env.CDK_DEFAULT_ACCOUNT,
     region: process.env.CDK_DEFAULT_REGION
   },
+});
+
+// AuthStack depends on InfrastructureStack for usersTable
+const authStack = new AuthStack(app, 'AuthStack', {
+  env: {
+    account: process.env.CDK_DEFAULT_ACCOUNT,
+    region: process.env.CDK_DEFAULT_REGION
+  },
+  usersTable: infraStack.usersTable,
 });
 
 // LambdaStack depends on resources from InfrastructureStack
