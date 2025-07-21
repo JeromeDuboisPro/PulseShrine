@@ -1,0 +1,1 @@
+# Post-confirmation Lambda for Cognito user initialization

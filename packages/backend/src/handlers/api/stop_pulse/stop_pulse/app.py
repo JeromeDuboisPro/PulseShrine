@@ -2,11 +2,12 @@ import os
 from aws_lambda_powertools import Logger
 from aws_lambda_powertools.event_handler import APIGatewayRestResolver
 from aws_lambda_powertools.event_handler.api_gateway import CORSConfig
-from aws_lambda_powertools.event_handler.exceptions import BadRequestError
+from aws_lambda_powertools.event_handler.exceptions import BadRequestError, UnauthorizedError
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from pydantic import ValidationError
 from typing import Any
 
+from shared.utils.auth import extract_user_id_from_event
 from stop_pulse.models import StopPulseRequest
 from stop_pulse.services import stop_pulse
 
@@ -29,10 +30,19 @@ app = APIGatewayRestResolver(cors=cors_config)
 @app.post("/stop-pulse")
 def stop_pulse_handler():
     """
-    Handler function to post a pulse.
+    Handler function to stop a pulse.
+    Extracts user_id from JWT token in the request context.
     """
+    # Extract user_id from JWT token
+    user_id = extract_user_id_from_event(app.current_event.raw_event)
+    if not user_id:
+        logger.error("No user_id found in JWT token")
+        raise UnauthorizedError("Authentication required")
+    
     try:
         body = app.current_event.json_body
+        # Inject user_id from JWT token into the request body
+        body["user_id"] = user_id
         stop_pulse_data = StopPulseRequest(**body)
     except (ValidationError, TypeError, ValueError) as exc:
         logger.error(f"Validation error: {str(exc)}")
@@ -48,8 +58,8 @@ def stop_pulse_handler():
     )
 
     if not result:
-        logger.error("Failed to post pulse due to invalid input data.")
-        raise BadRequestError("Failed to post pulse. Please check the input data.")
+        logger.error("Failed to stop pulse due to invalid input data.")
+        raise BadRequestError("Failed to stop pulse. Please check the input data.")
 
     return result.model_dump(mode="json")
 

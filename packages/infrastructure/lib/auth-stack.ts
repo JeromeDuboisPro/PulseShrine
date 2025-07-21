@@ -1,10 +1,13 @@
 import * as cdk from "aws-cdk-lib";
 import * as cognito from "aws-cdk-lib/aws-cognito";
 import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
+import * as lambda from "aws-cdk-lib/aws-lambda";
 import { Construct } from "constructs";
 
 interface AuthStackProps extends cdk.StackProps {
   usersTable: dynamodb.ITable;
+  postConfirmationFunction: lambda.IFunction;
+  environment: string; // 'dev', 'stag', 'prod'
 }
 
 export class AuthStack extends cdk.Stack {
@@ -19,7 +22,7 @@ export class AuthStack extends cdk.Stack {
     // =====================================================
 
     this.userPool = new cognito.UserPool(this, "PulseShrineUserPool", {
-      userPoolName: "ps-user-pool",
+      userPoolName: `ps-user-pool-${props.environment}`,
       selfSignUpEnabled: true,
       signInAliases: {
         email: true,
@@ -44,6 +47,9 @@ export class AuthStack extends cdk.Stack {
       },
       accountRecovery: cognito.AccountRecovery.EMAIL_ONLY,
       removalPolicy: cdk.RemovalPolicy.DESTROY, // For development - change for production
+      lambdaTriggers: {
+        postConfirmation: props.postConfirmationFunction,
+      },
     });
 
     // =====================================================

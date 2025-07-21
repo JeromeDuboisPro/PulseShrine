@@ -4,6 +4,10 @@ import * as sqs from "aws-cdk-lib/aws-sqs";
 import * as ssm from "aws-cdk-lib/aws-ssm";
 import { Construct } from "constructs";
 
+interface InfrastructureStackProps extends cdk.StackProps {
+  environment: string; // 'dev', 'stag', 'prod'
+}
+
 export class InfrastructureStack extends cdk.Stack {
   startPulseTable: cdk.aws_dynamodb.Table;
   stopPulseTable: cdk.aws_dynamodb.Table;
@@ -11,17 +15,19 @@ export class InfrastructureStack extends cdk.Stack {
   aiUsageTrackingTable: cdk.aws_dynamodb.Table;
   usersTable: cdk.aws_dynamodb.Table;
   pulsesIngestionDDBDLQ: cdk.aws_sqs.Queue;
-  constructor(scope: Construct, id: string, props?: cdk.StackProps) {
+  constructor(scope: Construct, id: string, props: InfrastructureStackProps) {
     super(scope, id, props);
 
+    const env = props.environment;
+
     const startPulseTable = new dynamodb.Table(this, "PulseTable", {
-      tableName: "ps-start-pulse-table",
+      tableName: `ps-start-pulse-table-${env}`,
       partitionKey: { name: "user_id", type: dynamodb.AttributeType.STRING },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
     });
 
     const stopPulseTable = new dynamodb.Table(this, "StopPulseTable", {
-      tableName: "ps-stop-pulse-table",
+      tableName: `ps-stop-pulse-table-${env}`,
       partitionKey: { name: "pulse_id", type: dynamodb.AttributeType.STRING },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
       stream: dynamodb.StreamViewType.NEW_IMAGE,
@@ -37,7 +43,7 @@ export class InfrastructureStack extends cdk.Stack {
     });
 
     const ingestedPulseTable = new dynamodb.Table(this, "IngestedPulseTable", {
-      tableName: "ps-ingested-pulse-table",
+      tableName: `ps-ingested-pulse-table-${env}`,
       partitionKey: { name: "pulse_id", type: dynamodb.AttributeType.STRING },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
     });
@@ -58,7 +64,7 @@ export class InfrastructureStack extends cdk.Stack {
       this,
       "AIUsageTrackingTable",
       {
-        tableName: "ps-ai-usage-tracking",
+        tableName: `ps-ai-usage-tracking-${env}`,
         partitionKey: { name: "PK", type: dynamodb.AttributeType.STRING }, // USER#userId
         sortKey: { name: "SK", type: dynamodb.AttributeType.STRING }, // EVENT#timestamp#eventId or DAILY#date
         billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
@@ -84,7 +90,7 @@ export class InfrastructureStack extends cdk.Stack {
 
     // Users Table for user profiles and plan management
     const usersTable = new dynamodb.Table(this, "UsersTable", {
-      tableName: "ps-users",
+      tableName: `ps-users-${env}`,
       partitionKey: { name: "PK", type: dynamodb.AttributeType.STRING }, // USER#userId
       sortKey: { name: "SK", type: dynamodb.AttributeType.STRING }, // PROFILE or PLAN or SETTINGS
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
@@ -93,7 +99,7 @@ export class InfrastructureStack extends cdk.Stack {
 
     // Create the DLQ for the DynamoDB Pipe
     const pulsesIngestionDDBDLQ = new sqs.Queue(this, "pulsesIngestionDDBDLQ", {
-      queueName: "ps-pulse-ingestion-ddb-dlq",
+      queueName: `ps-pulse-ingestion-ddb-dlq-${env}`,
       retentionPeriod: cdk.Duration.days(14),
     });
 

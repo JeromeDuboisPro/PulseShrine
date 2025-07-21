@@ -1,4 +1,5 @@
-import { config } from './config';
+import { getCurrentUser, fetchAuthSession } from 'aws-amplify/auth';
+import getAmplifyConfig from './amplify-config';
 
 // Types based on your existing API structure
 export interface StartPulse {
@@ -119,22 +120,55 @@ export class ApiError extends Error {
   }
 }
 
-// Base API call function
+// Get JWT token from Cognito
+async function getAuthToken(): Promise<string> {
+  try {
+    const session = await fetchAuthSession();
+    const token = session.tokens?.idToken?.toString();
+    
+    if (!token) {
+      throw new ApiError('No authentication token available. Please sign in.', 401, 'NO_AUTH_TOKEN');
+    }
+    
+    return token;
+  } catch (error) {
+    console.error('Failed to get auth token:', error);
+    throw new ApiError('Authentication failed. Please sign in again.', 401, 'AUTH_FAILED');
+  }
+}
+
+// Get current user ID from Cognito
+export async function getCurrentUserId(): Promise<string> {
+  try {
+    const user = await getCurrentUser();
+    return user.userId;
+  } catch (error) {
+    console.error('Failed to get current user:', error);
+    throw new ApiError('Unable to get user information. Please sign in again.', 401, 'USER_INFO_FAILED');
+  }
+}
+
+// Base API call function with JWT authentication
 async function callPulseAPI<T>(
   method: string,
   endpoint: string,
   body?: Record<string, any>
 ): Promise<T> {
-  if (!config.apiKey || !config.apiBaseUrl) {
-    throw new ApiError('API configuration is missing. Please check your environment variables or configuration.');
+  const config = getAmplifyConfig();
+  
+  if (!config.apiGatewayUrl) {
+    throw new ApiError('API configuration is missing. Please check your environment variables.');
   }
 
-  const url = new URL(config.apiBaseUrl + endpoint);
+  // Get JWT token for authentication
+  const authToken = await getAuthToken();
+
+  const url = new URL(config.apiGatewayUrl + endpoint);
   const options: RequestInit = {
     method,
     headers: {
       'Content-Type': 'application/json',
-      'x-api-key': config.apiKey
+      'Authorization': `Bearer ${authToken}`,
     }
   };
 
@@ -163,6 +197,10 @@ async function callPulseAPI<T>(
         // If response is not JSON, use the default error message
       }
       
+      if (response.status === 401) {
+        throw new ApiError('Authentication failed. Please sign in again.', 401, 'UNAUTHORIZED');
+      }
+      
       if (response.status === 429) {
         throw new ApiError('Too many requests. Please wait a moment before trying again.', 429, 'RATE_LIMIT');
       }
@@ -188,10 +226,10 @@ async function callPulseAPI<T>(
 
 // API methods
 export const PulseAPI = {
-  // Get active pulse for user
-  getStartPulse: async (userId: string): Promise<StartPulse | null> => {
+  // Get active pulse for current user
+  getStartPulse: async (): Promise<StartPulse | null> => {
     try {
-      const result = await callPulseAPI<StartPulse>('GET', '/get-start-pulse', { user_id: userId });
+      const result = await callPulseAPI<StartPulse>('GET', '/get-start-pulse');
       return result;
     } catch (error) {
       if (error instanceof ApiError && error.status === 404) {
@@ -201,10 +239,10 @@ export const PulseAPI = {
     }
   },
 
-  // Get completed pulses for user
-  getStopPulses: async (userId: string): Promise<StopPulse[]> => {
+  // Get completed pulses for current user
+  getStopPulses: async (): Promise<StopPulse[]> => {
     try {
-      const result = await callPulseAPI<StopPulse[]>('GET', '/get-stop-pulses', { user_id: userId });
+      const result = await callPulseAPI<StopPulse[]>('GET', '/get-stop-pulses');
       return Array.isArray(result) ? result : [];
     } catch (error) {
       if (error instanceof ApiError && error.status === 404) {
@@ -214,10 +252,10 @@ export const PulseAPI = {
     }
   },
 
-  // Get processed/ingested pulses for user
-  getIngestedPulses: async (userId: string, nbItems?: number): Promise<IngestedPulse[]> => {
+  // Get processed/ingested pulses for current user
+  getIngestedPulses: async (nbItems?: number): Promise<IngestedPulse[]> => {
     try {
-      const params: any = { user_id: userId };
+      const params: any = {};
       if (nbItems !== undefined) {
         params.nb_items = nbItems;
       }
@@ -231,18 +269,16 @@ export const PulseAPI = {
     }
   },
 
-  // Start a new pulse
-  startPulse: async (userId: string, intent: string, durationSeconds: number, intentEmotion?: string): Promise<StartPulse> => {
+  // Start a new pulse for current user
+  startPulse: async (intent: string, durationSeconds: number, intentEmotion?: string): Promise<StartPulse> => {
     if (!intent.trim()) {
       throw new ApiError('Intention cannot be empty', 400, 'INVALID_INPUT');
     }
     
     const payload: any = {
-      user_id: userId,
-      intent: intent.trim()
+      intent: intent.trim(),
+      duration_seconds: durationSeconds
     };
-    
-    payload.duration_seconds = durationSeconds;
     
     if (intentEmotion) {
       payload.intent_emotion = intentEmotion;
@@ -251,10 +287,9 @@ export const PulseAPI = {
     return await callPulseAPI<StartPulse>('POST', '/start-pulse', payload);
   },
 
-  // Stop active pulse
-  stopPulse: async (userId: string, reflection: string, reflectionEmotion?: string): Promise<StopPulse> => {
+  // Stop active pulse for current user
+  stopPulse: async (reflection: string, reflectionEmotion?: string): Promise<StopPulse> => {
     const payload: any = {
-      user_id: userId,
       reflection: reflection.trim()
     };
     

@@ -2,14 +2,12 @@ import os
 from aws_lambda_powertools import Logger
 from aws_lambda_powertools.event_handler import APIGatewayRestResolver
 from aws_lambda_powertools.event_handler.api_gateway import CORSConfig
-from aws_lambda_powertools.event_handler.exceptions import BadRequestError
+from aws_lambda_powertools.event_handler.exceptions import BadRequestError, UnauthorizedError
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from typing import Any
 
-from shared.models.pulse import (
-    StopPulse,
-)
-
+from shared.models.pulse import StopPulse
+from shared.utils.auth import extract_user_id_from_event
 from get_stop_pulse.services import get_stop_pulses
 
 # Initialize the logger
@@ -30,13 +28,16 @@ app = APIGatewayRestResolver(cors=cors_config)
 @app.get("/get-stop-pulses")
 def get_stop_pulses_handler() -> list[StopPulse]:
     """
-    Handler function to get the start pulse of a user.
+    Handler function to get the stop pulses of a user.
+    Extracts user_id from JWT token in the request context.
     """
-    user_id = app.current_event.get_query_string_value("user_id")
+    # Extract user_id from JWT token
+    user_id = extract_user_id_from_event(app.current_event.raw_event)
     if not user_id:
-        logger.error("Missing user_id in query parameters")
-        raise BadRequestError("Missing user_id in query parameters")
-    logger.warning(f"Retrieving current StopPulses for user {user_id}")
+        logger.error("No user_id found in JWT token")
+        raise UnauthorizedError("Authentication required")
+    
+    logger.info(f"Retrieving current StopPulses for user {user_id}")
 
     try:
         results = list(
@@ -47,7 +48,7 @@ def get_stop_pulses_handler() -> list[StopPulse]:
 
     except Exception as exc:
         logger.error(f"Unexpected error: {str(exc)}")
-        raise BadRequestError("An unexpected error occurred while starting the pulse.")
+        raise BadRequestError("An unexpected error occurred while retrieving pulses.")
 
 
 def handler(event: dict[str, Any], context: LambdaContext) -> dict[str, Any]:
