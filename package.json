@@ -1,0 +1,25 @@
+{
+  "name": "pulseshrine-monorepo",
+  "private": true,
+  "version": "1.0.0",
+  "description": "PulseShrine - Serverless productivity tracking application",
+  "scripts": {
+    "deploy:frontend": "./deploy-frontend.sh",
+    "deploy:frontend:dev": "ENVIRONMENT=dev ./deploy-frontend.sh",
+    "deploy:frontend:stag": "ENVIRONMENT=stag ./deploy-frontend.sh",
+    "deploy:frontend:prod": "ENVIRONMENT=prod ./deploy-frontend.sh"
+  },
+  "workspaces": [
+    "packages/*"
+  ],
+  "keywords": [
+    "productivity",
+    "tracking",
+    "serverless",
+    "aws",
+    "react",
+    "typescript"
+  ],
+  "author": "Jerome",
+  "license": "MIT"
+}

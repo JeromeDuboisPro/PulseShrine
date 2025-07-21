@@ -2,12 +2,13 @@ import os
 from aws_lambda_powertools import Logger
 from aws_lambda_powertools.event_handler import APIGatewayRestResolver
 from aws_lambda_powertools.event_handler.api_gateway import CORSConfig
-from aws_lambda_powertools.event_handler.exceptions import BadRequestError
+from aws_lambda_powertools.event_handler.exceptions import BadRequestError, UnauthorizedError
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from typing import Any
-
-from get_start_pulse.services import get_start_pulse
 from datetime import datetime, timezone
+
+from shared.utils.auth import extract_user_id_from_event
+from get_start_pulse.services import get_start_pulse
 
 # Initialize the logger
 logger = Logger()
@@ -28,13 +29,15 @@ app = APIGatewayRestResolver(cors=cors_config)
 def get_start_pulse_handler() -> dict[str, Any] | None:
     """
     Handler function to get the start pulse of a user.
+    Extracts user_id from JWT token in the request context.
     """
-
-    user_id = app.current_event.get_query_string_value("user_id")
+    # Extract user_id from JWT token
+    user_id = extract_user_id_from_event(app.current_event.raw_event)
     if not user_id:
-        logger.error("Missing user_id in query parameters")
-        raise BadRequestError("Missing user_id in query parameters")
-    logger.warning(f"Retrieving current StartPulse for user {user_id}")
+        logger.error("No user_id found in JWT token")
+        raise UnauthorizedError("Authentication required")
+    
+    logger.info(f"Retrieving current StartPulse for user {user_id}")
     try:
         result = get_start_pulse(user_id=user_id, table_name=START_PULSE_TABLE_NAME)
         if result:
@@ -57,7 +60,7 @@ def get_start_pulse_handler() -> dict[str, Any] | None:
 
     except Exception as exc:
         logger.error(f"Unexpected error: {str(exc)}")
-        raise BadRequestError("An unexpected error occurred while starting the pulse.")
+        raise BadRequestError("An unexpected error occurred while retrieving the pulse.")
 
 
 def handler(event: dict[str, Any], context: LambdaContext) -> dict[str, Any]:

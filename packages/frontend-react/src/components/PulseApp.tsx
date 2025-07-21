@@ -1,16 +1,9 @@
-import { AlertCircle, Award, Brain, CreditCard, Heart, Moon, Mountain, Play, Settings, Sparkles, Star, Target, Zap } from 'lucide-react';
+import { AlertCircle, Award, Brain, CreditCard, Heart, Moon, Mountain, Play, Sparkles, Star, Target, Zap } from 'lucide-react';
 import React, { useEffect, useRef, useState } from 'react';
 import { ApiError, IngestedPulse, PulseAPI, StartPulse, StopPulse } from '../api';
-import { ApiConfig, updateConfig } from '../config';
-import { ConfigurationModal } from './ConfigurationModal';
 import { PulseShrineLogoSvg } from './PulseShrineLogoSvg';
 
-interface PulseAppProps {
-  config: ApiConfig;
-  onReconfigure: () => void;
-}
-
-export const PulseApp: React.FC<PulseAppProps> = ({ config, onReconfigure }) => {
+export const PulseApp: React.FC = () => {
   const [currentView, setCurrentView] = useState('shrine');
   const [activePulse, setActivePulse] = useState<StartPulse | null>(null);
   const [timeLeft, setTimeLeft] = useState(0);
@@ -25,17 +18,16 @@ export const PulseApp: React.FC<PulseAppProps> = ({ config, onReconfigure }) => 
   const [duration, setDuration] = useState(25);
   const [error, setError] = useState<string | null>(null);
   const [isLoading] = useState(false);
-  const [showConfigModal, setShowConfigModal] = useState(false);
   const [planNotification, setPlanNotification] = useState<{
     message: string;
     type: 'upgrade' | 'budget' | 'achievement';
     pulse?: IngestedPulse | StopPulse;
   } | null>(null);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
-  const userIdRef = useRef(config.userId);
   const loadPulsesRef = useRef<(() => Promise<void>) | null>(null);
   const stableTimeLeftRef = useRef(0); // Stable reference to prevent flicker
   const [stopButtonEnabled, setStopButtonEnabled] = useState(false);
+
 
   // Helper to detect connection/API issues
   const isConnectionError = (errorMessage: string | null): boolean => {
@@ -66,7 +58,7 @@ export const PulseApp: React.FC<PulseAppProps> = ({ config, onReconfigure }) => 
 
   // Update global config on mount (one time only)
   useEffect(() => {
-    updateConfig(config);
+    // Configuration is now handled by Amplify
   }, []); // Empty dependency array - only run once
 
   // Initialize and set up polling - SIMPLIFIED to avoid dependency loops
@@ -78,9 +70,9 @@ export const PulseApp: React.FC<PulseAppProps> = ({ config, onReconfigure }) => 
       try {
         setError(null);
         const [ingested, stopped, started] = await Promise.all([
-          PulseAPI.getIngestedPulses(userIdRef.current, MAX_STONES),
-          PulseAPI.getStopPulses(userIdRef.current),
-          PulseAPI.getStartPulse(userIdRef.current)
+          PulseAPI.getIngestedPulses(MAX_STONES),
+          PulseAPI.getStopPulses(),
+          PulseAPI.getStartPulse()
         ]);
         
         setActivePulse(started);
@@ -268,7 +260,7 @@ export const PulseApp: React.FC<PulseAppProps> = ({ config, onReconfigure }) => 
     
     // Make async API call
     try {
-      const pulse = await PulseAPI.startPulse(userIdRef.current, intention, duration * 60, selectedEnergy);
+      const pulse = await PulseAPI.startPulse(intention, duration * 60, selectedEnergy);
       setActivePulse(pulse);
       setStopButtonEnabled(true); // Enable stop button on success
     } catch (err) {
@@ -308,7 +300,7 @@ export const PulseApp: React.FC<PulseAppProps> = ({ config, onReconfigure }) => 
     setTimeout(() => setPlanNotification(null), 5000);
     
     // Fire-and-forget API call
-    PulseAPI.stopPulse(userIdRef.current, reflection, emotion)
+    PulseAPI.stopPulse(reflection, emotion)
       .then(() => {
         // Refresh pulses in background to show completed pulse
         if (loadPulsesRef.current) {
@@ -479,13 +471,7 @@ export const PulseApp: React.FC<PulseAppProps> = ({ config, onReconfigure }) => 
                 </h1>
               </div>
               <div className="flex-1 flex justify-end">
-                <button
-                  onClick={() => setShowConfigModal(true)}
-                  className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
-                  title="API Settings"
-                >
-                  <Settings className="w-5 h-5" />
-                </button>
+                {/* Authentication is handled by AuthWrapper */}
               </div>
             </div>
             <p className="text-gray-600">Mindful space of focused productivity</p>
@@ -1385,31 +1371,6 @@ export const PulseApp: React.FC<PulseAppProps> = ({ config, onReconfigure }) => 
   return (
     <>
       {renderCurrentView()}
-      <ConfigurationModal
-        isOpen={showConfigModal}
-        onClose={() => setShowConfigModal(false)}
-        onConfigured={(newConfig) => {
-          // Save the config to localStorage
-          updateConfig(newConfig);
-          
-          // Always update the userIdRef
-          userIdRef.current = newConfig.userId;
-          
-          // If user changes the config significantly, ask them to restart
-          if (newConfig.apiBaseUrl !== config.apiBaseUrl || newConfig.apiKey !== config.apiKey) {
-            if (confirm('API configuration changed. Do you want to restart the app to apply changes?')) {
-              onReconfigure();
-            } else {
-              // User declined restart, but config is still saved
-              setShowConfigModal(false);
-            }
-          } else {
-            // Minor changes (userId only) - just close modal
-            setShowConfigModal(false);
-          }
-        }}
-        currentConfig={config}
-      />
     </>
   );
 };

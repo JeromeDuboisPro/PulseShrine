@@ -13,6 +13,7 @@ interface LambdaStackProps extends cdk.StackProps {
   aiUsageTrackingTable: dynamodb.ITable;
   usersTable: dynamodb.ITable;
   bedrockModelId?: string;
+  environment: string; // 'dev', 'stag', 'prod'
 }
 
 export class LambdaStack extends cdk.Stack {
@@ -25,6 +26,7 @@ export class LambdaStack extends cdk.Stack {
   public readonly bedrockEnhancementFunction: PythonFunction;
   public readonly standardEnhancementFunction: PythonFunction;
   public readonly pureIngestFunction: PythonFunction;
+  public readonly postConfirmationFunction: PythonFunction;
 
   constructor(scope: Construct, id: string, props: LambdaStackProps) {
     super(scope, id, props);
@@ -135,7 +137,7 @@ export class LambdaStack extends cdk.Stack {
       ...nestedApiProps,
       entry: path.resolve("../backend/src/handlers/api/start_pulse"),
       index: "start_pulse/app.py",
-      functionName: "ps-start-pulse",
+      functionName: `ps-start-pulse-${props.environment}`,
       description: "Function to start pulses",
       logRetention: cdk.aws_logs.RetentionDays.FIVE_DAYS,
       environment: {
@@ -148,7 +150,7 @@ export class LambdaStack extends cdk.Stack {
       ...nestedApiProps,
       entry: path.resolve("../backend/src/handlers/api/stop_pulse"),
       index: "stop_pulse/app.py",
-      functionName: "ps-stop-pulse",
+      functionName: `ps-stop-pulse-${props.environment}`,
       description: "Function to stop pulses",
       environment: {
         START_PULSE_TABLE_NAME: props.startPulseTable.tableName,
@@ -168,7 +170,7 @@ export class LambdaStack extends cdk.Stack {
         ...nestedApiProps,
         entry: path.resolve("../backend/src/handlers/api/get_start_pulse"),
         index: "get_start_pulse/app.py",
-        functionName: "ps-get-start-pulse",
+        functionName: `ps-get-start-pulse-${props.environment}`,
         description: "Function to get the start pulse",
         logRetention: cdk.aws_logs.RetentionDays.FIVE_DAYS,
         environment: {
@@ -186,7 +188,7 @@ export class LambdaStack extends cdk.Stack {
         ...nestedApiProps,
         entry: path.resolve("../backend/src/handlers/api/get_stop_pulse"),
         index: "get_stop_pulse/app.py",
-        functionName: "ps-get-stop-pulses",
+        functionName: `ps-get-stop-pulses-${props.environment}`,
         description: "Function to get the stop pulses",
         logRetention: cdk.aws_logs.RetentionDays.FIVE_DAYS,
         environment: {
@@ -204,7 +206,7 @@ export class LambdaStack extends cdk.Stack {
         ...nestedApiProps,
         entry: path.resolve("../backend/src/handlers/api/get_ingested_pulse"),
         index: "get_ingested_pulse/app.py",
-        functionName: "ps-get-ingested-pulses",
+        functionName: `ps-get-ingested-pulses-${props.environment}`,
         description: "Function to get the ingested pulses",
         logRetention: cdk.aws_logs.RetentionDays.FIVE_DAYS,
         environment: {
@@ -226,7 +228,7 @@ export class LambdaStack extends cdk.Stack {
       ...nestedCostOptimizedProps,
       entry: path.resolve("../backend/src/handlers/events/ai_selection"),
       index: "ai_selection/app.py",
-      functionName: "ps-ai-selection",
+      functionName: `ps-ai-selection-${props.environment}`,
       description: "Function to select pulses for AI enhancement",
       timeout: cdk.Duration.seconds(30),
       environment: {
@@ -246,7 +248,7 @@ export class LambdaStack extends cdk.Stack {
           "../backend/src/handlers/events/bedrock_enhancement",
         ),
         index: "bedrock_enhancement/app.py",
-        functionName: "ps-bedrock-enhancement",
+        functionName: `ps-bedrock-enhancement-${props.environment}`,
         description: "Function to enhance pulses using AWS Bedrock",
         // Using cost-optimized settings - AI can be slower for cost savings
         environment: {
@@ -313,7 +315,7 @@ export class LambdaStack extends cdk.Stack {
           "../backend/src/handlers/events/standard_enhancement",
         ),
         index: "standard_enhancement/app.py",
-        functionName: "ps-standard-enhancement",
+        functionName: `ps-standard-enhancement-${props.environment}`,
         description: "Function to generate standard titles and badges",
       },
     );
@@ -323,7 +325,7 @@ export class LambdaStack extends cdk.Stack {
       ...nestedCostOptimizedProps,
       entry: path.resolve("../backend/src/handlers/events/pure_ingest"),
       index: "pure_ingest/app.py",
-      functionName: "ps-pure-ingest",
+      functionName: `ps-pure-ingest-${props.environment}`,
       description: "Function to store pulses in DynamoDB",
       environment: {
         STOP_PULSE_TABLE_NAME: props.stopPulseTable.tableName,
@@ -333,6 +335,28 @@ export class LambdaStack extends cdk.Stack {
       memorySize: 192
     });
 
+    // =====================================================
+    // Post-Confirmation Lambda Function
+    // =====================================================
+
+    // Post-Confirmation Function - initializes users after Cognito registration
+    this.postConfirmationFunction = new PythonFunction(
+      this,
+      "PostConfirmationFunction",
+      {
+        ...nestedCostOptimizedProps,
+        entry: path.resolve("../backend/src/handlers/events/post_confirmation"),
+        index: "post_confirmation/app.py",
+        functionName: `ps-post-confirmation-${props.environment}`,
+        description: "Initialize users in DynamoDB after Cognito registration",
+        timeout: cdk.Duration.seconds(30),
+        environment: {
+          USERS_TABLE_NAME: props.usersTable.tableName,
+          AI_USAGE_TRACKING_TABLE_NAME: props.aiUsageTrackingTable.tableName,
+        },
+      },
+    );
+
     // Grant DynamoDB permissions
     props.ingestedPulseTable.grantWriteData(this.bedrockEnhancementFunction);
     props.ingestedPulseTable.grantWriteData(this.pureIngestFunction);
@@ -340,5 +364,9 @@ export class LambdaStack extends cdk.Stack {
 
     // Grant Users table read/write access to pure ingest function (for stats tracking)
     props.usersTable.grantReadWriteData(this.pureIngestFunction);
+
+    // Grant permissions to post-confirmation function
+    props.usersTable.grantReadWriteData(this.postConfirmationFunction);
+    props.aiUsageTrackingTable.grantReadWriteData(this.postConfirmationFunction);
   }
 }

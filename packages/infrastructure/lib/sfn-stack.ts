@@ -17,6 +17,7 @@ interface SfnStackProps extends cdk.StackProps {
   bedrockEnhancementFunction: lambda.IFunction;
   standardEnhancementFunction: lambda.IFunction;
   pureIngestFunction: lambda.IFunction;
+  environment: string; // 'dev', 'stag', 'prod'
 }
 
 export class SfnStack extends cdk.Stack {
@@ -87,7 +88,7 @@ export class SfnStack extends cdk.Stack {
     // =====================================================
 
     const sFNLogGroup = new cdk.aws_logs.LogGroup(this, "SfnLogGroup", {
-      logGroupName: "/aws/vendedlogs/states/ps-ai-ingestion-workflow",
+      logGroupName: `/aws/vendedlogs/states/ps-ai-ingestion-workflow-${props.environment}`,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
       retention: cdk.aws_logs.RetentionDays.ONE_WEEK,
     });
@@ -97,7 +98,7 @@ export class SfnStack extends cdk.Stack {
       "AIIngestionWorkflow",
       {
         stateMachineType: sfn.StateMachineType.EXPRESS,
-        stateMachineName: "ps-ai-ingestion-workflow",
+        stateMachineName: `ps-ai-ingestion-workflow-${props.environment}`,
         definition: workflowDefinition,
         timeout: cdk.Duration.seconds(300),
         comment: "AI-enhanced pulse ingestion workflow with smart selection",
@@ -149,7 +150,7 @@ export class SfnStack extends cdk.Stack {
 
     // Create the EventBridge Pipe
     new pipes.Pipe(this, "StopPulseToStepFunctionsPipe", {
-      pipeName: "stop-pulse-to-step-functions-pipe",
+      pipeName: `stop-pulse-to-step-functions-pipe-${props.environment}`,
       source: pipeSource,
       target: pipeTarget,
       filter: sourceFilter,

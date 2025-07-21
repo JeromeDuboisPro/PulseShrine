@@ -1,6 +1,7 @@
 import { PythonFunction } from "@aws-cdk/aws-lambda-python-alpha";
 import * as cdk from "aws-cdk-lib";
 import * as apigateway from "aws-cdk-lib/aws-apigateway";
+import * as cognito from "aws-cdk-lib/aws-cognito";
 import { Construct } from "constructs";
 
 interface ApiGatewayStackProps extends cdk.StackProps {
@@ -9,6 +10,8 @@ interface ApiGatewayStackProps extends cdk.StackProps {
   pythonGetIngestedPulsesFunction: PythonFunction;
   pythonStartFunction: PythonFunction;
   pythonStopFunction: PythonFunction;
+  userPool: cognito.UserPool;
+  environment: string; // 'dev', 'stag', 'prod'
 }
 
 export class ApiGatewayStack extends cdk.Stack {
@@ -18,48 +21,46 @@ export class ApiGatewayStack extends cdk.Stack {
     super(scope, id, props);
 
     const api = new apigateway.RestApi(this, "PulseApi", {
-      restApiName: "Pulse Service",
+      restApiName: `Pulse Service ${props.environment}`,
       deployOptions: {
-        throttlingRateLimit: 5,
-        throttlingBurstLimit: 5,
+        throttlingRateLimit: 100,  // Increased for authenticated users
+        throttlingBurstLimit: 200,
       },
-      apiKeySourceType: apigateway.ApiKeySourceType.HEADER,
       defaultCorsPreflightOptions: {
         allowOrigins: apigateway.Cors.ALL_ORIGINS,
         allowMethods: apigateway.Cors.ALL_METHODS,
-        allowHeaders: apigateway.Cors.DEFAULT_HEADERS,
+        allowHeaders: [
+          "Content-Type",
+          "X-Amz-Date", 
+          "Authorization",
+          "X-Api-Key",
+          "X-Amz-Security-Token",
+          "X-Amz-User-Agent"
+        ],
       },
     });
 
-    const apiKey = api.addApiKey("PulseApiKey", {
-      apiKeyName: "PulseApiKey",
-      value: undefined,
-      description: "API Key for Pulse API",
-    });
+    // =====================================================
+    // Cognito Authorizer
+    // =====================================================
 
-    const usagePlan = api.addUsagePlan("PulseUsagePlan", {
-      name: "PulseUsagePlan",
-      throttle: {
-        rateLimit: 10,
-        burstLimit: 10,
-      },
-      quota: {
-        limit: 10000,
-        period: cdk.aws_apigateway.Period.DAY,
-      },
-    });
-    usagePlan.addApiKey(apiKey);
-    usagePlan.addApiStage({
-      stage: api.deploymentStage,
-      api,
-    });
+    const cognitoAuthorizer = new apigateway.CognitoUserPoolsAuthorizer(
+      this,
+      "PulseCognitoAuthorizer",
+      {
+        cognitoUserPools: [props.userPool],
+        authorizerName: "ps-cognito-authorizer",
+        identitySource: "method.request.header.Authorization",
+      }
+    );
 
     const startPulseResource = api.root.addResource("start-pulse");
     startPulseResource.addMethod(
       "POST",
       new apigateway.LambdaIntegration(props.pythonStartFunction),
       {
-        apiKeyRequired: true,
+        authorizer: cognitoAuthorizer,
+        authorizationType: apigateway.AuthorizationType.COGNITO,
         requestModels: {
           "application/json": new apigateway.Model(
             this,
@@ -70,9 +71,8 @@ export class ApiGatewayStack extends cdk.Stack {
               modelName: "StartPulseRequest",
               schema: {
                 type: apigateway.JsonSchemaType.OBJECT,
-                required: ["user_id", "intent"],
+                required: ["intent"],
                 properties: {
-                  user_id: { type: apigateway.JsonSchemaType.STRING },
                   start_time: {
                     type: apigateway.JsonSchemaType.STRING,
                     format: "date-time",
@@ -97,7 +97,8 @@ export class ApiGatewayStack extends cdk.Stack {
       "POST",
       new apigateway.LambdaIntegration(props.pythonStopFunction),
       {
-        apiKeyRequired: true,
+        authorizer: cognitoAuthorizer,
+        authorizationType: apigateway.AuthorizationType.COGNITO,
         requestModels: {
           "application/json": new apigateway.Model(
             this,
@@ -108,9 +109,8 @@ export class ApiGatewayStack extends cdk.Stack {
               modelName: "StopPulseRequest",
               schema: {
                 type: apigateway.JsonSchemaType.OBJECT,
-                required: ["user_id", "reflexion"],
+                required: ["reflexion"],
                 properties: {
-                  user_id: { type: apigateway.JsonSchemaType.STRING },
                   reflexion: { type: apigateway.JsonSchemaType.STRING },
                 },
               },
@@ -125,10 +125,9 @@ export class ApiGatewayStack extends cdk.Stack {
       "GET",
       new apigateway.LambdaIntegration(props.pythonGetStartPulseFunction),
       {
-        apiKeyRequired: true,
-        requestParameters: {
-          "method.request.querystring.user_id": true, // Require user_id as a query parameter
-        },
+        authorizer: cognitoAuthorizer,
+        authorizationType: apigateway.AuthorizationType.COGNITO,
+        requestParameters: {},  // user_id will be extracted from JWT
       },
     );
 
@@ -137,10 +136,9 @@ export class ApiGatewayStack extends cdk.Stack {
       "GET",
       new apigateway.LambdaIntegration(props.pythonGetStopPulsesFunction),
       {
-        apiKeyRequired: true,
-        requestParameters: {
-          "method.request.querystring.user_id": true, // Require user_id as a query parameter
-        },
+        authorizer: cognitoAuthorizer,
+        authorizationType: apigateway.AuthorizationType.COGNITO,
+        requestParameters: {},  // user_id will be extracted from JWT
       },
     );
 
@@ -151,11 +149,11 @@ export class ApiGatewayStack extends cdk.Stack {
       "GET",
       new apigateway.LambdaIntegration(props.pythonGetIngestedPulsesFunction),
       {
-        apiKeyRequired: true,
+        authorizer: cognitoAuthorizer,
+        authorizationType: apigateway.AuthorizationType.COGNITO,
         requestParameters: {
-          "method.request.querystring.user_id": true, // Require user_id as a query parameter
           "method.request.querystring.nb_items": false, // Optional nb_items as a query parameter
-        },
+        },  // user_id will be extracted from JWT
       },
     );
 
@@ -179,10 +177,19 @@ export class ApiGatewayStack extends cdk.Stack {
 
     this.api = api;
 
-    new cdk.CfnOutput(this, "PulseApiKeyOutput", {
-      value: apiKey.keyId,
-      description: "The API Key for the Pulse API",
-      exportName: "PulseApiKey",
+    // =====================================================
+    // Outputs
+    // =====================================================
+
+    new cdk.CfnOutput(this, "PulseApiUrl", {
+      value: api.url,
+      description: "Base URL for the Pulse API",
+      exportName: "PulseApiUrl",
+    });
+
+    new cdk.CfnOutput(this, "PulseCognitoAuthorizerId", {
+      value: cognitoAuthorizer.authorizerId,
+      description: "ID of the Cognito authorizer",
     });
   }
 }

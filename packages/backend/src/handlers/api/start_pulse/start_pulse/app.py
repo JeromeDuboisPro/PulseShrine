@@ -2,7 +2,7 @@ import os
 from aws_lambda_powertools import Logger
 from aws_lambda_powertools.event_handler import APIGatewayRestResolver
 from aws_lambda_powertools.event_handler.api_gateway import CORSConfig
-from aws_lambda_powertools.event_handler.exceptions import BadRequestError
+from aws_lambda_powertools.event_handler.exceptions import BadRequestError, UnauthorizedError
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from pydantic import ValidationError
 from typing import Any
@@ -11,6 +11,7 @@ from shared.models.pulse import (
     PulseCreationError,
     StartPulse,
 )
+from shared.utils.auth import extract_user_id_from_event
 
 from start_pulse.models import PulseCreationErrorAlreadyPresent
 from start_pulse.services import start_pulse
@@ -34,9 +35,18 @@ app = APIGatewayRestResolver(cors=cors_config)
 def start_pulse_handler() -> dict[str, Any]:
     """
     Handler function to start a pulse.
+    Extracts user_id from JWT token in the request context.
     """
+    # Extract user_id from JWT token
+    user_id = extract_user_id_from_event(app.current_event.raw_event)
+    if not user_id:
+        logger.error("No user_id found in JWT token")
+        raise UnauthorizedError("Authentication required")
+    
     try:
         body = app.current_event.json_body
+        # Inject user_id from JWT token into the request body
+        body["user_id"] = user_id
         pulse_data = StartPulse(**body)
     except (ValidationError, TypeError, ValueError) as exc:
         logger.error(f"Validation error: {str(exc)}")
