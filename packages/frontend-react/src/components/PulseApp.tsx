@@ -1,7 +1,10 @@
 import { AlertCircle, Award, Brain, CreditCard, Heart, Moon, Mountain, Play, Sparkles, Star, Target, Zap } from 'lucide-react';
 import React, { useEffect, useRef, useState } from 'react';
-import { ApiError, IngestedPulse, PulseAPI, StartPulse, StopPulse } from '../api';
+import { ApiError, IngestedPulse, PulseAPI, StartPulse, StopPulse, SubscriptionInfo } from '../api';
 import { PulseShrineLogoSvg } from './PulseShrineLogoSvg';
+import { SubscriptionStatus } from './SubscriptionStatus';
+import { SubscriptionDashboard } from './SubscriptionDashboard';
+import { QuotaExceededModal } from './QuotaExceededModal';
 
 export const PulseApp: React.FC = () => {
   const [currentView, setCurrentView] = useState('shrine');
@@ -27,6 +30,17 @@ export const PulseApp: React.FC = () => {
   const loadPulsesRef = useRef<(() => Promise<void>) | null>(null);
   const stableTimeLeftRef = useRef(0); // Stable reference to prevent flicker
   const [stopButtonEnabled, setStopButtonEnabled] = useState(false);
+  const [showSubscriptionDashboard, setShowSubscriptionDashboard] = useState(false);
+  const [quotaExceeded, setQuotaExceeded] = useState<{
+    show: boolean;
+    type: 'pulses' | 'ai_enhancements';
+    tier: string;
+  }>({
+    show: false,
+    type: 'pulses',
+    tier: 'free'
+  });
+  const [subscriptionData, setSubscriptionData] = useState<SubscriptionInfo | undefined>(undefined);
 
 
   // Helper to detect connection/API issues
@@ -69,11 +83,17 @@ export const PulseApp: React.FC = () => {
     const doLoadPulses = async () => {
       try {
         setError(null);
-        const [ingested, stopped, started] = await Promise.all([
+        const [ingested, stopped, started, subscription] = await Promise.all([
           PulseAPI.getIngestedPulses(MAX_STONES),
           PulseAPI.getStopPulses(),
-          PulseAPI.getStartPulse()
+          PulseAPI.getStartPulse(),
+          PulseAPI.getSubscription().catch(() => null) // Don't fail if subscription fetch fails
         ]);
+        
+        // Store subscription data for quota modal
+        if (subscription) {
+          setSubscriptionData(subscription);
+        }
         
         setActivePulse(started);
         setCompletedPulses(ingested.sort((a, b) => b.inverted_timestamp - a.inverted_timestamp));
@@ -264,7 +284,25 @@ export const PulseApp: React.FC = () => {
       setActivePulse(pulse);
       setStopButtonEnabled(true); // Enable stop button on success
     } catch (err) {
-      // On error, show zen error screen
+      // Check if it's a quota exceeded error
+      if (err instanceof ApiError && err.status === 429) {
+        // Stop the timer and reset state
+        setIsRunning(false);
+        setClientTimerActive(false);
+        setTimerEndTime(null);
+        setTimerInitialized(false);
+        setCurrentView('shrine');
+        
+        // Show quota exceeded modal
+        setQuotaExceeded({
+          show: true,
+          type: 'pulses',
+          tier: subscriptionData?.subscription_tier || 'free'
+        });
+        return;
+      }
+      
+      // On other errors, show zen error screen
       setIsRunning(false);
       setClientTimerActive(false);
       setTimerEndTime(null);
@@ -447,7 +485,11 @@ export const PulseApp: React.FC = () => {
         <div className="max-w-4xl mx-auto">
           <header className="text-center mb-8">
             <div className="flex items-center justify-between mb-4">
-              <div className="flex-1"></div>
+              <div className="flex-1">
+                <div className="flex justify-start">
+                  <SubscriptionStatus onShowDashboard={() => setShowSubscriptionDashboard(true)} />
+                </div>
+              </div>
               <div className="flex items-center space-x-3">
                 <div className="relative group">
                   <div className="absolute inset-0 bg-gradient-to-r from-purple-400 to-blue-400 rounded-full opacity-10 blur-sm animate-zen-breathe"></div>
@@ -625,6 +667,7 @@ export const PulseApp: React.FC = () => {
                     const symbol = pulse.gen_badge?.trim().split(' ')[0] || '✨';
                     const isProcessing = (pulse as any).processing;
                     const isAiEnhanced = pulse.ai_enhanced && !isProcessing;
+                    const couldBeEnhanced = !isAiEnhanced && !isProcessing && (pulse as any).ai_selection_info?.could_be_enhanced === true;
                     return (
                       <div key={pulse.pulse_id} className="group flex items-center justify-center">
                         <div className="relative">
@@ -634,6 +677,8 @@ export const PulseApp: React.FC = () => {
                                 ? 'bg-gradient-to-br from-yellow-100/80 to-orange-100/80 border-yellow-300/50 animate-pulse hover:shadow-lg' 
                                 : isAiEnhanced
                                 ? 'bg-gradient-to-br from-purple-100/90 to-blue-100/90 border-purple-300/70 shadow-lg shadow-purple-200/30 hover:shadow-xl hover:shadow-purple-300/40 animate-pulse-gentle'
+                                : couldBeEnhanced
+                                ? 'bg-gradient-to-br from-gray-100/80 to-purple-50/60 border-gray-300/50 border-dashed hover:shadow-lg hover:border-purple-200/70'
                                 : 'bg-gradient-to-br from-white/80 to-slate-50/80 border-slate-200/50 hover:shadow-lg'
                             }`}
                             style={{
@@ -647,9 +692,14 @@ export const PulseApp: React.FC = () => {
                                 <Brain className="w-2 h-2 text-white" />
                               </div>
                             )}
+                            {couldBeEnhanced && (
+                              <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-gradient-to-br from-gray-300 to-gray-400 flex items-center justify-center opacity-60">
+                                <Brain className="w-2 h-2 text-gray-600" />
+                              </div>
+                            )}
                           </div>
                           <div className={`absolute bottom-full mb-3 left-1/2 transform -translate-x-1/2 backdrop-blur-sm text-white px-4 py-3 rounded-lg text-sm opacity-0 group-hover:opacity-100 transition-all duration-300 z-50 w-96 shadow-lg pointer-events-none ${
-                            isProcessing ? 'bg-yellow-800/90' : isAiEnhanced ? 'bg-purple-800/90' : 'bg-slate-800/90'
+                            isProcessing ? 'bg-yellow-800/90' : isAiEnhanced ? 'bg-purple-800/90' : couldBeEnhanced ? 'bg-gray-800/90' : 'bg-slate-800/90'
                           }`}>
                             <div className="font-medium text-slate-100">
                               {pulse.gen_badge && (
@@ -664,6 +714,12 @@ export const PulseApp: React.FC = () => {
                             )}
                             {isProcessing && (
                               <div className="text-yellow-300 mt-1 text-xs animate-pulse">Processing your focus stone...</div>
+                            )}
+                            {couldBeEnhanced && (pulse as any).ai_selection_info?.decision_reason && (
+                              <div className="text-gray-300 mt-1 text-xs border border-gray-600 rounded px-2 py-1 bg-gray-700/50">
+                                💡 Could have been AI enhanced! {(pulse as any).ai_selection_info.decision_reason}
+                                <div className="text-gray-400 mt-1">Upgrade to unlock AI insights →</div>
+                              </div>
                             )}
                             {isAiEnhanced && pulse.ai_insights?.productivity_score && (
                               <div className="text-purple-300 mt-1 text-xs">
@@ -1371,6 +1427,17 @@ export const PulseApp: React.FC = () => {
   return (
     <>
       {renderCurrentView()}
+      {showSubscriptionDashboard && (
+        <SubscriptionDashboard onClose={() => setShowSubscriptionDashboard(false)} />
+      )}
+      <QuotaExceededModal
+        isOpen={quotaExceeded.show}
+        onClose={() => setQuotaExceeded({ ...quotaExceeded, show: false })}
+        quotaType={quotaExceeded.type}
+        currentTier={quotaExceeded.tier}
+        subscription={subscriptionData}
+        onUpgrade={() => setShowSubscriptionDashboard(true)}
+      />
     </>
   );
 };

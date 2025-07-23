@@ -1,7 +1,14 @@
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
+from enum import Enum
 from functools import cached_property
 from pydantic import BaseModel, Field, computed_field, field_validator
 from typing import List, Optional
+
+from shared.constants.subscription_tiers import (
+    FREE_MONTHLY_PULSES, FREE_AI_SAMPLES, FREE_TEAM_WORKSPACES,
+    PRO_MONTHLY_PULSES, PRO_AI_ENHANCEMENTS, PRO_TEAM_WORKSPACES,
+    ENTERPRISE_MONTHLY_PULSES, ENTERPRISE_AI_ENHANCEMENTS, ENTERPRISE_TEAM_WORKSPACES
+)
 
 
 class PulseCreationError(Exception):
@@ -195,3 +202,130 @@ class ArchivedPulse(StopPulse):
             raise PulseCreationError(
                 "archived_at must be a datetime or ISO formatted string"
             )
+
+
+# Subscription and User Models for Monetization
+class SubscriptionTier(str, Enum):
+    """Subscription tier enumeration"""
+    FREE = "free"
+    PRO = "pro" 
+    ENTERPRISE = "enterprise"
+
+
+class SubscriptionStatus(str, Enum):
+    """Subscription status enumeration"""
+    ACTIVE = "active"
+    CANCELED = "canceled"
+    PAST_DUE = "past_due"
+    TRIAL = "trial"
+    INCOMPLETE = "incomplete"
+
+
+class UsageQuota(BaseModel):
+    """User usage quotas based on subscription tier"""
+    monthly_pulses: int = Field(description="Number of pulses allowed per month")
+    ai_enhancements: int = Field(description="Number of AI enhancements allowed per month")
+    advanced_analytics: bool = Field(default=False, description="Access to advanced analytics")
+    team_workspaces: int = Field(default=1, description="Number of team workspaces allowed")
+    export_enabled: bool = Field(default=False, description="Can export pulse data")
+    priority_processing: bool = Field(default=False, description="Priority AI processing")
+    custom_prompts: bool = Field(default=False, description="Custom AI enhancement prompts")
+
+
+class UserSubscription(BaseModel):
+    """User subscription model for monetization tracking"""
+    user_id: str = Field(description="Unique user identifier")
+    subscription_tier: SubscriptionTier = Field(default=SubscriptionTier.FREE)
+    subscription_status: SubscriptionStatus = Field(default=SubscriptionStatus.ACTIVE)
+    stripe_customer_id: Optional[str] = Field(default=None, description="Stripe customer ID")
+    stripe_subscription_id: Optional[str] = Field(default=None, description="Stripe subscription ID")
+    
+    # Billing cycle
+    billing_cycle_start: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    billing_cycle_end: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc) + timedelta(days=30)
+    )
+    next_billing_date: Optional[datetime] = Field(default=None)
+    
+    # Usage tracking for current billing cycle
+    current_pulse_count: int = Field(default=0, description="Pulses used this billing cycle")
+    current_ai_enhancement_count: int = Field(default=0, description="AI enhancements used this billing cycle")
+    total_ai_cost_cents: float = Field(default=0.0, description="Total AI cost this billing cycle in cents")
+    
+    # Subscription metadata
+    trial_end_date: Optional[datetime] = Field(default=None)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    
+    @computed_field
+    @cached_property
+    def quotas(self) -> UsageQuota:
+        """Get usage quotas based on subscription tier"""
+        quotas_map = {
+            SubscriptionTier.FREE: UsageQuota(
+                monthly_pulses=FREE_MONTHLY_PULSES,
+                ai_enhancements=FREE_AI_SAMPLES,
+                advanced_analytics=False,
+                team_workspaces=FREE_TEAM_WORKSPACES,
+                export_enabled=False,
+                priority_processing=False,
+                custom_prompts=False
+            ),
+            SubscriptionTier.PRO: UsageQuota(
+                monthly_pulses=PRO_MONTHLY_PULSES,
+                ai_enhancements=PRO_AI_ENHANCEMENTS,
+                advanced_analytics=True,
+                team_workspaces=PRO_TEAM_WORKSPACES,
+                export_enabled=True,
+                priority_processing=True,
+                custom_prompts=False
+            ),
+            SubscriptionTier.ENTERPRISE: UsageQuota(
+                monthly_pulses=ENTERPRISE_MONTHLY_PULSES,
+                ai_enhancements=ENTERPRISE_AI_ENHANCEMENTS,
+                advanced_analytics=True,
+                team_workspaces=ENTERPRISE_TEAM_WORKSPACES,
+                export_enabled=True,
+                priority_processing=True,
+                custom_prompts=True
+            )
+        }
+        return quotas_map[self.subscription_tier]
+    
+    @computed_field
+    @cached_property
+    def can_create_pulse(self) -> bool:
+        """Check if user can create a new pulse based on quotas"""
+        if self.quotas.monthly_pulses == -1:  # Unlimited
+            return True
+        return self.current_pulse_count < self.quotas.monthly_pulses
+    
+    @computed_field
+    @cached_property  
+    def can_use_ai_enhancement(self) -> bool:
+        """Check if user can use AI enhancement based on quotas"""
+        if self.quotas.ai_enhancements == -1:  # Unlimited
+            return True
+        if self.quotas.ai_enhancements == 0:  # Not allowed
+            return False
+        return self.current_ai_enhancement_count < self.quotas.ai_enhancements
+    
+    def increment_pulse_usage(self) -> None:
+        """Increment pulse usage counter"""
+        self.current_pulse_count += 1
+        self.updated_at = datetime.now(timezone.utc)
+    
+    def increment_ai_usage(self, cost_cents: float = 0.0) -> None:
+        """Increment AI enhancement usage and cost"""
+        self.current_ai_enhancement_count += 1
+        self.total_ai_cost_cents += cost_cents
+        self.updated_at = datetime.now(timezone.utc)
+    
+    def reset_billing_cycle(self) -> None:
+        """Reset usage counters for new billing cycle"""
+        self.current_pulse_count = 0
+        self.current_ai_enhancement_count = 0
+        self.total_ai_cost_cents = 0.0
+        self.billing_cycle_start = datetime.now(timezone.utc)
+        self.billing_cycle_end = datetime.now(timezone.utc) + timedelta(days=30)
+        self.updated_at = datetime.now(timezone.utc)

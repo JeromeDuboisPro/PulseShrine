@@ -11,6 +11,7 @@ from shared.models.pulse import StopPulse
 try:
     from shared.services.ai_budget_service import AIBudgetService
     from shared.ai_tracking.services.tracking_integration import AITrackingIntegration
+    from shared.utils.quota_middleware import record_ai_usage
 except ImportError:
     # Fallback imports for local testing
     import sys
@@ -21,6 +22,7 @@ except ImportError:
     )
     from shared.services.ai_budget_service import AIBudgetService
     from shared.ai_tracking.services.tracking_integration import AITrackingIntegration
+    from shared.utils.quota_middleware import record_ai_usage
 
 # Initialize the logger
 logger = Logger()
@@ -949,6 +951,14 @@ def handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, Any]:
                     pulse_data,  # Pass pulse data for reward analysis
                 )
                 logger.info(f"Recorded AI usage for user {user_id}: {usage_result}")
+                
+                # Record subscription usage for monetization tracking
+                users_table_name = os.environ.get('USERS_TABLE_NAME', 'ps-users-dev')
+                subscription_success = record_ai_usage(user_id, final_cost_cents, users_table_name)
+                if subscription_success:
+                    logger.info(f"Recorded subscription AI usage for user {user_id}: {final_cost_cents:.4f}¢")
+                else:
+                    logger.warning(f"Failed to record subscription AI usage for user {user_id}")
 
                 # Add rewards to pulse data if any were triggered
                 if usage_result.get("rewards"):

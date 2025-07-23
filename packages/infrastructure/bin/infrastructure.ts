@@ -72,6 +72,7 @@ new ApiGatewayStack(app, 'ApiGatewayStack', {
   pythonGetIngestedPulsesFunction: lambdaStack.pythonGetIngestedPulsesFunction,
   pythonStartFunction: lambdaStack.pythonStartFunction,
   pythonStopFunction: lambdaStack.pythonStopFunction,
+  subscriptionFunction: lambdaStack.subscriptionFunction,
   userPool: authStack.userPool,
   environment,
 });
