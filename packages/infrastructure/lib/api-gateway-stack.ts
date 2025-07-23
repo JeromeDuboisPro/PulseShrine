@@ -10,6 +10,7 @@ interface ApiGatewayStackProps extends cdk.StackProps {
   pythonGetIngestedPulsesFunction: PythonFunction;
   pythonStartFunction: PythonFunction;
   pythonStopFunction: PythonFunction;
+  subscriptionFunction: PythonFunction;
   userPool: cognito.UserPool;
   environment: string; // 'dev', 'stag', 'prod'
 }
@@ -154,6 +155,94 @@ export class ApiGatewayStack extends cdk.Stack {
         requestParameters: {
           "method.request.querystring.nb_items": false, // Optional nb_items as a query parameter
         },  // user_id will be extracted from JWT
+      },
+    );
+
+    // =====================================================
+    // Subscription API Routes
+    // =====================================================
+
+    const subscriptionResource = api.root.addResource("subscription");
+    
+    // GET /subscription - Get user subscription info
+    subscriptionResource.addMethod(
+      "GET",
+      new apigateway.LambdaIntegration(props.subscriptionFunction),
+      {
+        authorizer: cognitoAuthorizer,
+        authorizationType: apigateway.AuthorizationType.COGNITO,
+      },
+    );
+
+    // POST /subscription/upgrade - Upgrade subscription tier
+    const upgradeResource = subscriptionResource.addResource("upgrade");
+    upgradeResource.addMethod(
+      "POST", 
+      new apigateway.LambdaIntegration(props.subscriptionFunction),
+      {
+        authorizer: cognitoAuthorizer,
+        authorizationType: apigateway.AuthorizationType.COGNITO,
+        requestModels: {
+          "application/json": new apigateway.Model(
+            this,
+            "SubscriptionUpgradeRequestModel",
+            {
+              restApi: api,
+              contentType: "application/json",
+              modelName: "SubscriptionUpgradeRequest",
+              schema: {
+                type: apigateway.JsonSchemaType.OBJECT,
+                required: ["tier"],
+                properties: {
+                  tier: { 
+                    type: apigateway.JsonSchemaType.STRING,
+                    enum: ["pro", "enterprise"]
+                  },
+                  stripe_subscription_id: { type: apigateway.JsonSchemaType.STRING },
+                },
+              },
+            },
+          ),
+        },
+      },
+    );
+
+    // GET /subscription/pricing - Get pricing information (public)
+    const pricingResource = subscriptionResource.addResource("pricing");
+    pricingResource.addMethod(
+      "GET",
+      new apigateway.LambdaIntegration(props.subscriptionFunction),
+      {
+        // No authorizer - this is public information
+      },
+    );
+
+    // POST /subscription/create-customer - Create Stripe customer
+    const createCustomerResource = subscriptionResource.addResource("create-customer");
+    createCustomerResource.addMethod(
+      "POST",
+      new apigateway.LambdaIntegration(props.subscriptionFunction),
+      {
+        authorizer: cognitoAuthorizer,
+        authorizationType: apigateway.AuthorizationType.COGNITO,
+        requestModels: {
+          "application/json": new apigateway.Model(
+            this,
+            "CreateCustomerRequestModel",
+            {
+              restApi: api,
+              contentType: "application/json",
+              modelName: "CreateCustomerRequest",
+              schema: {
+                type: apigateway.JsonSchemaType.OBJECT,
+                required: ["email"],
+                properties: {
+                  email: { type: apigateway.JsonSchemaType.STRING },
+                },
+              },
+            },
+          ),
+        },
       },
     );
 

@@ -23,6 +23,7 @@ try:
     )
     from shared.ai_tracking.services.tracking_integration import AITrackingIntegration
     from shared.utils.app_with_tracking import app_with_tracking
+    from shared.services.subscription_service import SubscriptionService
 except ImportError:
     # Fallback imports for local testing
     import sys
@@ -194,13 +195,45 @@ def should_enhance_with_ai(
         return False, "AI enhancement disabled", {}
 
     try:
-        # Calculate worthiness score using enhanced algorithm
+        # Calculate worthiness score first - needed for both quota decisions and FOMO
         worthiness_score = worthiness_calculator.calculate_worthiness(
             pulse_data, user_id
         )
-
-        # Estimate cost for this enhancement
+        
+        # Estimate cost for this enhancement  
         estimated_cost_cents = estimate_enhancement_cost(pulse_data, config)
+        
+    except Exception as e:
+        logger.error(f"Error calculating worthiness for user {user_id}: {str(e)}")
+        return False, f"Error calculating enhancement worthiness", {}
+
+    # Check subscription quota - but we now have worthiness for FOMO messaging
+    try:
+        users_table_name = os.environ.get('USERS_TABLE_NAME', 'ps-users-dev')
+        subscription_service = SubscriptionService(users_table_name)
+        quota_result = subscription_service.check_ai_quota(user_id)
+        
+        if not quota_result['allowed']:
+            # Determine if this pulse could have been enhanced (for FOMO)
+            could_be_enhanced = worthiness_score >= GOOD_THRESHOLD
+            
+            logger.info(f"AI enhancement blocked by subscription quota for user {user_id}: {quota_result['reason']}, worthiness: {worthiness_score:.3f}, could_be_enhanced: {could_be_enhanced}")
+            return False, f"Subscription limit: {quota_result['reason']}", {
+                'quota_blocked': True,
+                'quota_info': quota_result,
+                'worthiness_score': worthiness_score,
+                'estimated_cost_cents': estimated_cost_cents,
+                'could_be_enhanced': could_be_enhanced,
+                'decision_reason': f"Subscription limit blocked pulse with worthiness {worthiness_score:.3f}"
+            }
+        
+        logger.info(f"AI quota check passed for user {user_id}: {quota_result.get('remaining', 'unlimited')} remaining")
+    except Exception as e:
+        logger.error(f"Error checking subscription quota for user {user_id}: {str(e)}")
+        # Don't block on subscription service errors during transition period
+        pass
+
+    try:
 
         # Debug: Check if user exists in ps-users table
         try:

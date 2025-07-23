@@ -27,6 +27,7 @@ export class LambdaStack extends cdk.Stack {
   public readonly standardEnhancementFunction: PythonFunction;
   public readonly pureIngestFunction: PythonFunction;
   public readonly postConfirmationFunction: PythonFunction;
+  public readonly subscriptionFunction: PythonFunction;
 
   constructor(scope: Construct, id: string, props: LambdaStackProps) {
     super(scope, id, props);
@@ -142,6 +143,7 @@ export class LambdaStack extends cdk.Stack {
       logRetention: cdk.aws_logs.RetentionDays.FIVE_DAYS,
       environment: {
         START_PULSE_TABLE_NAME: props.startPulseTable.tableName,
+        SUBSCRIPTION_TABLE_NAME: props.usersTable.tableName,
       },
       memorySize: 128
     });
@@ -162,6 +164,9 @@ export class LambdaStack extends cdk.Stack {
     props.startPulseTable.grantReadWriteData(this.pythonStartFunction);
     props.startPulseTable.grantReadWriteData(this.pythonStopFunction);
     props.stopPulseTable.grantReadWriteData(this.pythonStopFunction);
+    
+    // Grant subscription access to start pulse function
+    props.usersTable.grantReadWriteData(this.pythonStartFunction);
 
     this.pythonGetStartPulseFunction = new PythonFunction(
       this,
@@ -368,5 +373,25 @@ export class LambdaStack extends cdk.Stack {
     // Grant permissions to post-confirmation function
     props.usersTable.grantReadWriteData(this.postConfirmationFunction);
     props.aiUsageTrackingTable.grantReadWriteData(this.postConfirmationFunction);
+
+    // =====================================================
+    // Subscription Management Function
+    // =====================================================
+
+    this.subscriptionFunction = new PythonFunction(this, "SubscriptionFunction", {
+      ...nestedApiProps,
+      entry: path.resolve("../backend/src/handlers/api/subscription"),
+      index: "subscription/app.py", 
+      functionName: `ps-subscription-${props.environment}`,
+      description: "Function to manage user subscriptions and billing",
+      timeout: cdk.Duration.seconds(30),
+      environment: {
+        SUBSCRIPTION_TABLE_NAME: props.usersTable.tableName,
+      },
+      memorySize: 256
+    });
+
+    // Grant subscription function access to users table
+    props.usersTable.grantReadWriteData(this.subscriptionFunction);
   }
 }

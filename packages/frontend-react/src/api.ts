@@ -15,6 +15,7 @@ export interface StartPulse {
   gen_badge?: string;
   remaining_seconds?: number;
   server_time?: string;
+  subscription?: SubscriptionInfo; // Added subscription info to pulse responses
 }
 
 export interface StopPulse {
@@ -106,6 +107,67 @@ export interface IngestedPulse {
     };
     timestamp: string;
   };
+}
+
+// Subscription and Usage Types
+export interface SubscriptionInfo {
+  subscription_tier: 'free' | 'pro' | 'enterprise';
+  subscription_status: 'active' | 'canceled' | 'past_due' | 'trial' | 'incomplete';
+  billing_cycle: {
+    start: string;
+    end: string;
+    days_remaining: number;
+  };
+  usage: {
+    pulses: {
+      used: number;
+      quota: number;
+      percentage: number;
+      unlimited: boolean;
+    };
+    ai_enhancements: {
+      used: number;
+      quota: number;
+      percentage: number;
+      unlimited: boolean;
+    };
+    ai_cost_cents: number;
+  };
+  features: {
+    advanced_analytics: boolean;
+    export_enabled: boolean;
+    priority_processing: boolean;
+    custom_prompts: boolean;
+    team_workspaces: number;
+  };
+}
+
+export interface PricingTier {
+  name: string;
+  price: number;
+  currency: string;
+  interval: string;
+  features: {
+    monthly_pulses: number;
+    ai_enhancements: number;
+    advanced_analytics: boolean;
+    export_enabled: boolean;
+    priority_processing: boolean;
+    custom_prompts: boolean;
+    team_workspaces: number;
+  };
+  description: string;
+  popular?: boolean;
+}
+
+export interface PricingInfo {
+  tiers: {
+    free: PricingTier;
+    pro: PricingTier;
+    enterprise: PricingTier;
+  };
+  currency_symbol: string;
+  trial_days: number;
 }
 
 // API Error handling
@@ -298,5 +360,26 @@ export const PulseAPI = {
     }
     
     return await callPulseAPI<StopPulse>('POST', '/stop-pulse', payload);
+  },
+
+  // Subscription Management
+  getSubscription: async (): Promise<SubscriptionInfo> => {
+    return await callPulseAPI<SubscriptionInfo>('GET', '/subscription');
+  },
+
+  getPricing: async (): Promise<PricingInfo> => {
+    return await callPulseAPI<PricingInfo>('GET', '/subscription/pricing');
+  },
+
+  upgradeSubscription: async (tier: 'pro' | 'enterprise', stripeSubscriptionId?: string): Promise<{success: boolean; message: string; subscription: SubscriptionInfo}> => {
+    const payload: any = { tier };
+    if (stripeSubscriptionId) {
+      payload.stripe_subscription_id = stripeSubscriptionId;
+    }
+    return await callPulseAPI('POST', '/subscription/upgrade', payload);
+  },
+
+  createCustomer: async (email: string): Promise<{success: boolean; customer_id: string; message: string}> => {
+    return await callPulseAPI('POST', '/subscription/create-customer', { email });
   }
 };
